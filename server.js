@@ -15,20 +15,24 @@ const db = require('./config/connection');
 //     console.log('Connected to MySQL ' + db.threadId);
 // });
 
-app.get('/', (req, res) => {
-    res.send('Hello World!');
-});
+// app.get('/', (req, res) => {
+//     res.send('Hello World!');
+// });
 
-app.get('/modules', (req, res) => {
-    db.query('SELECT * FROM modules', (err, results) => {
-        if (err) {
-            console.error('error running query: ' + err.stack);
-            return;
-        }
-        res.json(results);
-    });
-});
+// app.get('/modules', (req, res) => {
+//     db.query('SELECT * FROM modules', (err, results) => {
+//         if (err) {
+//             console.error('error running query: ' + err.stack);
+//             return;
+//         }
+//         res.json(results);
+//     });
+// });
 
 sequelize.sync({ force: false }).then(() => {
+    console.log('Database synced');
     app.listen(port, () => console.log('Now listening on: http://localhost:' + port)); 
+  })
+  .catch((err) => {
+    console.error('Unable to sync database: ', err);
   });
