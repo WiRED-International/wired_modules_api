@@ -1,6 +1,7 @@
 const { Model, DataTypes } = require('sequelize');
 
 const sequelize = require('../config/connection');
+const SubCategories = require('./subCategories');
 
 class Modules extends Model {}
 
@@ -21,28 +22,36 @@ Modules.init(
             allowNull: false
         },
         topics: {
-            type: DataTypes.ARRAY(DataTypes.STRING),
+            type: DataTypes.STRING,
             allowNull: false
         },
         letters: {
-            type: DataTypes.ARRAY(DataTypes.STRING),
+            type: DataTypes.STRING,
             allowNull: false
         },
         version: {
             type: DataTypes.STRING,
             allowNull: false
         },
+        is_downloadable: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+        },
         downloadLink: {
             type: DataTypes.STRING,
-            allowNull: false
+            allowNull: true,
         },
         packageSize: {
             type: DataTypes.STRING,
             allowNull: false
         },
-        isReference: {
-            type: DataTypes.BOOLEAN,
-            defaultValue: false
+        redirect_module_id: {
+            type: DataTypes.INTEGER,
+            allowNull: true, 
+            references: {
+              model: 'Modules',
+              key: 'id',
+            },
         },
     }, {
         sequelize,
@@ -53,5 +62,9 @@ Modules.init(
         underscored: true,
     }
 );
+
+Modules.belongsTo(Modules, { as: 'redirectedModule', foreignKey: 'redirect_module_id' });
+
+// Modules.belongsToMany(SubCategories, { as: 'subCategories', through: 'module_subcategory', foreignKey: 'module_id' });
 
 module.exports = Modules;
