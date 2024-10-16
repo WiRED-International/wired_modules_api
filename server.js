@@ -10,9 +10,13 @@ app.use(express.urlencoded({ extended: true }));
 const modulesRoutes = require('./controllers/api/modulesRoutes');
 const categoriesRoutes = require('./controllers/api/categoriesRoutes');
 const subCategoriesRoutes = require('./controllers/api/subCategoriesRoutes');
+const moduleSubCategoryRoutes = require('./controllers/api/moduleSubCategoryRoutes');
+
 app.use('/modules', modulesRoutes);
 app.use('/categories', categoriesRoutes);
 app.use('/subCategories', subCategoriesRoutes);
+app.use('/mts', moduleSubCategoryRoutes);
+app.use('/stm', moduleSubCategoryRoutes);
 
 sequelize.sync({ force: false }).then(() => {
     console.log('Database synced');

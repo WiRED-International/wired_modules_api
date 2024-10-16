@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { Modules } = require('../../models');
+const { Modules, SubCategories } = require('../../models');
 
 router.get('/', async (req, res) => {
   try {
@@ -8,7 +8,13 @@ router.get('/', async (req, res) => {
             {
                 model: Modules,
                 as: 'redirectedModule',
-                attributes: ['id', 'name', 'description', 'topics', 'letters', 'is_downloadable', 'downloadLink']
+                attributes: ['id', 'name', 'description', 'letters', 'is_downloadable', 'downloadLink']
+            },
+            {
+              model: SubCategories, 
+              as: 'subCategories',  
+              attributes: ['id', 'name', 'category_id'], 
+              through: { attributes: [] }, 
             },
         ],
     });
@@ -25,7 +31,13 @@ router.get('/:id', async (req, res) => {
             {
                 model: Modules,
                 as: 'redirectedModule',
-                attributes: ['id', 'name', 'description', 'topics', 'letters', 'is_downloadable', 'downloadLink']
+                attributes: ['id', 'name', 'description', 'letters', 'is_downloadable', 'downloadLink']
+            },
+            {
+              model: SubCategories, 
+              as: 'subCategories',  
+              attributes: ['id', 'name', 'category_id'], 
+              through: { attributes: [] }, 
             },
         ],
     });
@@ -39,13 +51,12 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-    const { name, description, topics, letters, version, is_downloadable, downloadLink, packageSize, redirect_module_id, } = req.body;
+    const { name, description, letters, version, is_downloadable, downloadLink, packageSize, redirect_module_id, } = req.body;
   try {
 
     const newModule = await Modules.create({
         name,
         description,
-        topics,
         letters,
         version,
         is_downloadable: Boolean(is_downloadable),
@@ -70,7 +81,6 @@ router.put('/:id', async (req, res) => {
     await module.update({
         name: name || module.name,
         description,
-        topics,
         letters,
         version,
         is_downloadable: Boolean(is_downloadable),
