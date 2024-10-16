@@ -9,13 +9,12 @@ router.get('/', async (req, res) => {
                 model: Categories,
                 as: 'category',
                 attributes: ['id', 'name'],
-                include: [
-                    {
-                        model: Modules,
-                        as: 'modules',
-                        attributes: ['id', 'name', 'description', 'topics', 'letters', 'is_downloadable', 'downloadLink']
-                    },
-                ],
+            },
+            {
+              model: Modules, 
+              as: 'modules', 
+              attributes: ['id', 'name', 'description', 'letters', 'is_downloadable', 'downloadLink'],
+              through: { attributes: [] }, 
             },
         ],
     });
@@ -33,13 +32,12 @@ router.get('/:id', async (req, res) => {
                 model: Categories,
                 as: 'category',
                 attributes: ['id', 'name'],
-                include: [
-                    {
-                        model: Modules,
-                        as: 'modules',
-                        attributes: ['id', 'name', 'description', 'topics', 'letters', 'is_downloadable', 'downloadLink']
-                    },
-                ],
+            },
+            {
+              model: Modules, 
+              as: 'modules', 
+              attributes: ['id', 'name', 'description', 'letters', 'is_downloadable', 'downloadLink'],
+              through: { attributes: [] }, 
             },
         ],
     });

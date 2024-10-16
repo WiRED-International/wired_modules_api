@@ -23,7 +23,7 @@ router.get('/:id', async (req, res) => {
     const category = await Categories.findByPk(req.params.id, {
         include: [
             {
-                model: Categories,
+                model: SubCategories,
                 as: 'subCategories',
                 attributes: ['id', 'name']
             },

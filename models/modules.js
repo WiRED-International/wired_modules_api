@@ -21,17 +21,13 @@ Modules.init(
             type: DataTypes.STRING,
             allowNull: false
         },
-        topics: {
-            type: DataTypes.STRING,
-            allowNull: false
-        },
         letters: {
             type: DataTypes.STRING,
             allowNull: false
         },
         version: {
             type: DataTypes.STRING,
-            allowNull: false
+            allowNull: true
         },
         is_downloadable: {
             type: DataTypes.BOOLEAN,
@@ -43,7 +39,7 @@ Modules.init(
         },
         packageSize: {
             type: DataTypes.STRING,
-            allowNull: false
+            allowNull: true
         },
         redirect_module_id: {
             type: DataTypes.INTEGER,
