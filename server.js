@@ -18,7 +18,8 @@ app.use('/subCategories', subCategoriesRoutes);
 app.use('/mts', moduleSubCategoryRoutes);
 app.use('/stm', moduleSubCategoryRoutes);
 
-sequelize.sync({ force: false }).then(() => {
+sequelize.sync({ force: false })
+  .then(async() => {
     console.log('Database synced');
     app.listen(port, () => console.log('Now listening on: http://localhost:' + port)); 
   })

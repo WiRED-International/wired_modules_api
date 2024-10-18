@@ -2,12 +2,12 @@ const router = require('express').Router();
 const { Modules, SubCategories } = require('../../models');
 
 router.post('/modules-to-subCategories', async (req, res) => {
-    const { module_id, sub_category_id } = req.body;
+    const { module_id, subcategory_id } = req.body;
     try {
         const module = await Modules.findByPk(module_id);
         if (!module) return res.status(404).json({ error: 'Module not found' });
     
-        await module.addSubCategories(sub_category_id); 
+        await module.addSubCategories(subcategory_id); 
     
         res.status(200).json({ message: 'Modules associated successfully' });
       } catch (error) {
@@ -16,9 +16,9 @@ router.post('/modules-to-subCategories', async (req, res) => {
 });
 
 router.post('/subCategories-to-modules', async (req, res) => {
-  const { sub_category_id, module_id } = req.body;
+  const { subcategory_id, module_id } = req.body;
   try {
-    const subCategory = await SubCategories.findByPk(sub_category_id);
+    const subCategory = await SubCategories.findByPk(subcategory_id);
     if (!subCategory) return res.status(404).json({ error: 'SubCategory not found' });
 
     await subCategory.addModules(module_id); 
