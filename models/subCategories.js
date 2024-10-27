@@ -4,7 +4,7 @@ const sequelize = require('../config/connection');
 const Categories = require('./categories');
 const Modules = require('./modules');
 
-class SubCategories extends Model {}
+class SubCategories extends Model {};
 
 SubCategories.init(
     {

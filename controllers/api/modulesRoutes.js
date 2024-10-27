@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { Modules, SubCategories } = require('../../models');
 
 router.get('/', async (req, res) => {
+  const { subcategoryId } = req.query;
   try {
     const modules = await Modules.findAll({
         include: [
@@ -13,6 +14,7 @@ router.get('/', async (req, res) => {
             {
               model: SubCategories, 
               as: 'subCategories',  
+              where: { id: subcategoryId},
               attributes: ['id', 'name', 'category_id'], 
               through: { attributes: [] }, 
             },
