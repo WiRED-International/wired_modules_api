@@ -5,6 +5,7 @@ const modulesData = [
     {
         //id: 1,
         name: 'Women\'s Health: Skin and hair health',
+        module_number: '',
         description: 'WiRED\'s medical team is currently rewriting the material for this series. Please return to this page for future updates',
         letters: 'W',
         version: '1.0.0',
@@ -17,6 +18,7 @@ const modulesData = [
     {
         //id: 2,
         name: 'Acne',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -27,6 +29,7 @@ const modulesData = [
     },    {
         //id: 3,
         name: 'HIV/AIDS: Caring for someone with AIDS at home',
+        module_number: '',
         description: '',
         letters: 'H',
         version: '1.0.0',
@@ -38,6 +41,7 @@ const modulesData = [
     {
         //id: 4,
         name: 'Acquired Immunodeficiency Syndrome',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -49,6 +53,7 @@ const modulesData = [
     {
         //id: 5,
         name: 'Bronchitis',
+        module_number: '',
         description: 'A Guide for General Audiences: This module is specifically targeted to general audiences and contains information about the causes, symptoms, diagnosis and treatment of bronchitis.',
         letters: 'B',
         version: '1.0.0',
@@ -60,6 +65,7 @@ const modulesData = [
     {
         //id: 6,
         name: 'Acute Bronchitis',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -71,6 +77,7 @@ const modulesData = [
     {
         //id: 7,
         name: 'Upper respiratory tract infection; Ear, nose and throat (ENT)',
+        module_number: '',
         description: '',
         letters: 'U',
         version: '1.0.0',
@@ -82,6 +89,7 @@ const modulesData = [
     {
         //id: 8,
         name: 'Adenoidectomy ',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -93,6 +101,7 @@ const modulesData = [
     {
         //id: 9,
         name: 'Adenoids',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -104,6 +113,7 @@ const modulesData = [
     {
         //id: 10,
         name: 'Seminar in attention deficit hyperactivity disorder (ADHD)',
+        module_number: '',
         description: '',
         letters: 'S',
         version: '1.0.0',
@@ -115,6 +125,7 @@ const modulesData = [
     {
         //id: 11,
         name: 'ADHD',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -126,6 +137,7 @@ const modulesData = [
     {
         //id: 12,
         name: 'HIV/AIDS: Basic information',
+        module_number: '',
         description: '',
         letters: 'H',
         version: '1.0.0',
@@ -137,6 +149,7 @@ const modulesData = [
     {
         //id: 13,
         name: 'AIDS',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -148,6 +161,7 @@ const modulesData = [
     {
         //id: 14,
         name: 'Air Pollution',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -159,6 +173,7 @@ const modulesData = [
     {
         //id: 15,
         name: 'Airborne Diseases',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -170,6 +185,7 @@ const modulesData = [
     {
         //id: 16,
         name: 'Alcohol - Quitting Alcohol for Health',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -181,6 +197,7 @@ const modulesData = [
     {
         //id: 17,
         name: 'Upper respiratory tract infection',
+        module_number: '',
         description: '',
         letters: 'U',
         version: '1.0.0',
@@ -192,6 +209,7 @@ const modulesData = [
     {
         //id: 18,
         name: 'Allergy',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -203,6 +221,7 @@ const modulesData = [
     {
         //id: 19,
         name: 'Alzheimer\'s disease',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -214,6 +233,7 @@ const modulesData = [
     {
         //id: 20,
         name: 'Anatomy & Illness Fundamentals—Part 1 (Express module)',
+        module_number: '',
         description: 'A Guide for Grass Roots Audiences: This module describes the circulatory, musculoskeletal, digestive, urinary and respiratory systems. The two main topics are healthy body functioning and unhealthy body functioning.',
         letters: 'A',
         version: '1.0.0',
@@ -225,6 +245,7 @@ const modulesData = [
     {
         //id: 21,
         name: 'Anatomy & Illness Fundamentals—Part 2 (Express module)',
+        module_number: '',
         description: 'A Guide for Grass Roots Audiences: This module describes the endocrine, lymphatic, immune, nervous and reproductive systems..',
         letters: 'A',
         version: '1.0.0',
@@ -236,6 +257,7 @@ const modulesData = [
     {
         //id: 22,
         name: 'Anatomy & Illness Fundamentals—Part 3 (Express module)',
+        module_number: '',
         description: 'A Guide for Grass Roots Audiences: This module describes infectious and non-infectious diseases.',
         letters: 'A',
         version: '1.0.0',
@@ -247,6 +269,7 @@ const modulesData = [
     {
         //id: 23,
         name: 'Anatomía y Enfermedad Fundamentos—Parte 1 (Modulo Expreso) (Spanish)',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -258,6 +281,7 @@ const modulesData = [
     {
         //id: 24,
         name: 'Anatomía y Enfermedad Fundamentos—Parte 2 (Modulo Expreso) (Spanish)',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -269,6 +293,7 @@ const modulesData = [
     {
         //id: 25,
         name: 'Anatomía y Enfermedad Fundamentos—Parte 3 (Modulo Expreso) (Spanish)',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -280,6 +305,7 @@ const modulesData = [
     {
         //id: 26,
         name: 'Anemia',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -291,6 +317,7 @@ const modulesData = [
     {
         //id: 27,
         name: 'Sickle Cell Disease',
+        module_number: '',
         description: '',
         letters: 'S',
         version: '1.0.0',
@@ -302,6 +329,7 @@ const modulesData = [
     {
         //id: 28,
         name: 'Anemia (Sickle Cell)',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -313,6 +341,7 @@ const modulesData = [
     {
         //id: 29,
         name: 'Mental Health: Depression',
+        module_number: '',
         description: '',
         letters: 'M',
         version: '1.0.0',
@@ -324,6 +353,7 @@ const modulesData = [
     {
         //id: 30,
         name: 'Antidepressants',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -335,6 +365,7 @@ const modulesData = [
     {
         //id: 31,
         name: 'High blood pressure (hypertension)',
+        module_number: '',
         description: '',
         letters: 'H',
         version: '1.0.0',
@@ -346,6 +377,7 @@ const modulesData = [
     {
         //id: 32,
         name: 'Antihypertensive Medicines',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -357,6 +389,7 @@ const modulesData = [
     {
         //id: 33,
         name: 'Antiretroviral therapy for adults and children',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -368,6 +401,7 @@ const modulesData = [
     {
         //id: 34,
         name: 'Seminar in anxiety disorders',
+        module_number: '',
         description: '',
         letters: 'S',
         version: '1.0.0',
@@ -379,6 +413,7 @@ const modulesData = [
     {
         //id: 35,
         name: 'Anxiety',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -390,6 +425,7 @@ const modulesData = [
     {
         //id: 36,
         name: 'Rheumatic Heart Disease Training Series',
+        module_number: '',
         description: '',
         letters: 'R',
         version: '1.0.0',
@@ -401,6 +437,7 @@ const modulesData = [
     {
         //id: 37,
         name: 'Aortic Stenosis',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -412,6 +449,7 @@ const modulesData = [
     {
         //id: 38,
         name: 'Meningitis',
+        module_number: '',
         description: '',
         letters: 'M',
         version: '1.0.0',
@@ -423,6 +461,7 @@ const modulesData = [
     {
         //id: 39,
         name: 'Arachnoiditis',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -434,6 +473,7 @@ const modulesData = [
     {
         //id: 40,
         name: 'Arthritis',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -445,6 +485,7 @@ const modulesData = [
     {
         //id: 41,
         name: 'Aseptic Meningitis',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -456,6 +497,7 @@ const modulesData = [
     {
         //id: 42,
         name: 'Asthma',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -467,6 +509,7 @@ const modulesData = [
     {
         //id: 43,
         name: 'Eye problems',
+        module_number: '',
         description: '',
         letters: 'E',
         version: '1.0.0',
@@ -478,6 +521,7 @@ const modulesData = [
     {
         //id: 44,
         name: 'Astigmatism',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -489,6 +533,7 @@ const modulesData = [
     {
         //id: 45,
         name: 'Fungal infections',
+        module_number: '',
         description: '',
         letters: 'F',
         version: '1.0.0',
@@ -500,6 +545,7 @@ const modulesData = [
     {
         //id: 46,
         name: 'Athlete\'s Foot',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -511,6 +557,7 @@ const modulesData = [
     {
         //id: 47,
         name: 'Attention Deficit Hyperactivity Disorder',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -522,6 +569,7 @@ const modulesData = [
     {
         //id: 48,
         name: 'Autoimmune Diseases, Introduction',
+        module_number: '',
         description: 'This module describes the immune system and how autoimmune diseases can affect almost any part of the body, such as the heart, brain, nerves, muscles, eyes and kidneys. The training covers the causes of autoimmune diseases, their signs, symptoms and treatment and lists common types of these illnesses.',
         letters: 'A',
         version: '1.0.0',
@@ -534,6 +582,7 @@ const modulesData = [
     {
         //id: 49,
         name: 'Maternal health and postnatal care',
+        module_number: '',
         description: '',
         letters: 'M',
         version: '1.0.0',
@@ -545,6 +594,7 @@ const modulesData = [
     {
         //id: 50,
         name: 'Baby Blues',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -556,6 +606,7 @@ const modulesData = [
     {
         //id: 51,
         name: 'Infant feeding',
+        module_number: '',
         description: '',
         letters: 'I',
         version: '1.0.0',
@@ -567,6 +618,7 @@ const modulesData = [
     {
         //id: 52,
         name: 'Baby Care',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -578,6 +630,7 @@ const modulesData = [
     {
         //id: 53,
         name: 'Infant health',
+        module_number: '',
         description: '',
         letters: 'I',
         version: '1.0.0',
@@ -589,6 +642,7 @@ const modulesData = [
     {
         //id: 54,
         name: 'Baby Health Checkup',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -600,6 +654,7 @@ const modulesData = [
     {
         //id: 55,
         name: 'Pain',
+        module_number: '',
         description: '',
         letters: 'P',
         version: '1.0.0',
@@ -611,6 +666,7 @@ const modulesData = [
     {
         //id: 56,
         name: 'Back Pain',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -622,6 +678,7 @@ const modulesData = [
     {
         //id: 57,
         name: 'First Aid: Bites and stings',
+        module_number: '',
         description: '',
         letters: 'F',
         version: '1.0.0',
@@ -633,6 +690,7 @@ const modulesData = [
     {
         //id: 58,
         name: 'Bee Stings',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -644,6 +702,7 @@ const modulesData = [
     {
         //id: 59,
         name: 'Before Pregnancy, Introduction to',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -655,6 +714,7 @@ const modulesData = [
     {
         //id: 60,
         name: 'Benign Prostatic Hyperplasia',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -666,6 +726,7 @@ const modulesData = [
     {
         //id: 61,
         name: 'Alcohol and substance abuse',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -677,6 +738,7 @@ const modulesData = [
     {
         //id: 62,
         name: 'Binge Drinking',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -688,6 +750,7 @@ const modulesData = [
     {
         //id: 63,
         name: 'Biosand filters',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -699,6 +762,7 @@ const modulesData = [
     {
         //id: 64,
         name: 'Seminar in bipolar disorder',
+        module_number: '',
         description: '',
         letters: 'S',
         version: '1.0.0',
@@ -710,6 +774,7 @@ const modulesData = [
     {
         //id: 65,
         name: 'Bipolar Disorder',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -721,6 +786,7 @@ const modulesData = [
     {
         //id: 66,
         name: 'Family planning',
+        module_number: '',
         description: '',
         letters: 'F',
         version: '1.0.0',
@@ -732,6 +798,7 @@ const modulesData = [
     {
         //id: 67,
         name: 'Birth Control',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -743,6 +810,7 @@ const modulesData = [
     {
         //id: 68,
         name: 'Birth Defects',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -754,6 +822,7 @@ const modulesData = [
     {
         //id: 69,
         name: 'Urinary tract infections',
+        module_number: '',
         description: '',
         letters: 'U',
         version: '1.0.0',
@@ -765,6 +834,7 @@ const modulesData = [
     {
         //id: 70,
         name: 'Bladder Infections',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -776,6 +846,7 @@ const modulesData = [
     {
         //id: 71,
         name: 'Women\'s Health: Blood disorders',
+        module_number: '',
         description: '',
         letters: 'W',
         version: '1.0.0',
@@ -787,6 +858,7 @@ const modulesData = [
     {
         //id: 72,
         name: 'Bleeding Disorders',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -798,6 +870,7 @@ const modulesData = [
     {
         //id: 73,
         name: 'Blood Cells',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -809,6 +882,7 @@ const modulesData = [
     {
         //id: 74,
         name: 'Blood Clots',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -820,6 +894,7 @@ const modulesData = [
     {
         //id: 75,
         name: 'Blood Disorders',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -832,6 +907,7 @@ const modulesData = [
     {
         //id: 76,
         name: 'Blood Pressure',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -843,6 +919,7 @@ const modulesData = [
     {
         //id: 77,
         name: 'Blood Pressure Medicines',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -854,6 +931,7 @@ const modulesData = [
     {
         //id: 78,
         name: 'Obesity',
+        module_number: '',
         description: '',
         letters: 'O',
         version: '1.0.0',
@@ -865,6 +943,7 @@ const modulesData = [
     {
         //id: 79,
         name: 'BMI',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -876,6 +955,7 @@ const modulesData = [
     {
         //id: 80,
         name: 'Body Weight',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -887,6 +967,7 @@ const modulesData = [
     {
         //id: 81,
         name: 'Alternative Medicine: Introduction',
+        module_number: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -898,6 +979,7 @@ const modulesData = [
     {
         //id: 82,
         name: 'Botanicals',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -909,6 +991,7 @@ const modulesData = [
     {
         //id: 83,
         name: 'Diarrhea, dehydration and ORT',
+        module_number: '',
         description: '',
         letters: 'D',
         version: '1.0.0',
@@ -920,6 +1003,7 @@ const modulesData = [
     {
         //id: 84,
         name: 'Bowel Movement',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -931,6 +1015,7 @@ const modulesData = [
     {
         //id: 85,
         name: 'Stroke',
+        module_number: '',
         description: '',
         letters: 'S',
         version: '1.0.0',
@@ -942,6 +1027,7 @@ const modulesData = [
     {
         //id: 86,
         name: 'Brain Attack',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -953,6 +1039,7 @@ const modulesData = [
     {
         //id: 87,
         name: 'Cancer: Breast',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',
@@ -964,6 +1051,7 @@ const modulesData = [
     {
         //id: 88,
         name: 'Breast Cancer',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -975,6 +1063,7 @@ const modulesData = [
     {
         //id: 89,
         name: 'Breast Feeding',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -986,6 +1075,7 @@ const modulesData = [
     {
         //id: 90,
         name: 'First Aid: Fractures',
+        module_number: '',
         description: '',
         letters: 'F',
         version: '1.0.0',
@@ -997,6 +1087,7 @@ const modulesData = [
     {
         //id: 91,
         name: 'Broken Bones',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -1008,6 +1099,7 @@ const modulesData = [
     {
         //id: 92,
         name: 'Bronchial Asthma',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -1019,6 +1111,7 @@ const modulesData = [
     {
         //id: 93,
         name: 'Pneumonia',
+        module_number: '',
         description: '',
         letters: 'P',
         version: '1.0.0',
@@ -1030,6 +1123,7 @@ const modulesData = [
     {
         //id: 94,
         name: 'Bronchopneumonia',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -1041,6 +1135,7 @@ const modulesData = [
     {
         //id: 95,
         name: 'First Aid: Burns',
+        module_number: '',
         description: '',
         letters: 'F',
         version: '1.0.0',
@@ -1052,6 +1147,7 @@ const modulesData = [
     {
         //id: 96,
         name: 'Burns',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -1064,6 +1160,7 @@ const modulesData = [
     {
         //id: 97,
         name: 'CAM',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',
@@ -1075,6 +1172,7 @@ const modulesData = [
     {
         //id: 98,
         name: 'Women\'s Health: Cancer',
+        module_number: '',
         description: '',
         letters: 'W',
         version: '1.0.0',
@@ -1086,6 +1184,7 @@ const modulesData = [
     {
         //id: 99,
         name: 'Cancer',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',
@@ -1097,6 +1196,7 @@ const modulesData = [
     {
         //id: 100,
         name: 'Introduction to Cancer - Part 1',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',
@@ -1108,6 +1208,7 @@ const modulesData = [
     {
         //id: 101,
         name: 'Introduction to Cancer - Part 2',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',
@@ -1119,6 +1220,7 @@ const modulesData = [
     {
         //id: 102,
         name: 'Introduction to Cancer - Part 3',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',
@@ -1130,6 +1232,7 @@ const modulesData = [
     {
         //id: 103,
         name: 'Bladder Cancer - Part 1',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -1141,6 +1244,7 @@ const modulesData = [
     {
         //id: 104,
         name: 'Bladder Cancer - Part 2',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -1152,6 +1256,7 @@ const modulesData = [
     {
         //id: 105,
         name: 'Brain tumors - Part 1',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -1163,6 +1268,7 @@ const modulesData = [
     {
         //id: 106,
         name: 'Brain tumors - Part 2',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -1174,6 +1280,7 @@ const modulesData = [
     {
         //id: 107,
         name: 'Cervical cancer - Part 1',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',
@@ -1185,6 +1292,7 @@ const modulesData = [
     {
         //id: 108,
         name: 'Cervical cancer - Part 2',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',
@@ -1196,6 +1304,7 @@ const modulesData = [
     {
         //id: 109,
         name: 'Colorectal cancer - Part 1',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',
@@ -1207,6 +1316,7 @@ const modulesData = [
     {
         //id: 110,
         name: 'Colorectal cancer - Part 2',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',
@@ -1218,6 +1328,7 @@ const modulesData = [
     {
         //id: 111,
         name: 'Hodgkin Lymphoma - Part 1',
+        module_number: '',
         description: '',
         letters: 'H',
         version: '1.0.0',
@@ -1229,6 +1340,7 @@ const modulesData = [
     {
         //id: 112,
         name: 'Hodgkin Lymphoma - Part 2',
+        module_number: '',
         description: '',
         letters: 'H',
         version: '1.0.0',
@@ -1240,6 +1352,7 @@ const modulesData = [
     {
         //id: 113,
         name: 'Kidney (Renal) Cancer',
+        module_number: '',
         description: '',
         letters: 'K',
         version: '1.0.0',
@@ -1251,6 +1364,7 @@ const modulesData = [
     {
         //id: 114,
         name: 'Ovarian Cancer (Express module)',
+        module_number: '',
         description: '',
         letters: 'O',
         version: '1.0.0',
@@ -1262,6 +1376,7 @@ const modulesData = [
     {
         //id: 115,
         name: 'Cáncer de Ovario (Modulo Expreso) (Spanish)',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',
@@ -1273,6 +1388,7 @@ const modulesData = [
     {
         //id: 116,
         name: 'Pancreatic cancer',
+        module_number: '',
         description: '',
         letters: 'P',
         version: '1.0.0',
@@ -1284,6 +1400,7 @@ const modulesData = [
     {
         //id: 117,
         name: 'Prostate Cancer (Express Module)',
+        module_number: '',
         description: '',
         letters: 'P',
         version: '1.0.0',
@@ -1295,6 +1412,7 @@ const modulesData = [
     {
         //id: 118,
         name: 'Cáncer de Próstata (Modulo Expreso) (Spanish)',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',
@@ -1306,6 +1424,7 @@ const modulesData = [
     {
         //id: 119,
         name: 'Breast cancer - Part 1',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -1317,6 +1436,7 @@ const modulesData = [
     {
         //id: 120,
         name: 'Breast cancer - Part 2',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -1328,6 +1448,7 @@ const modulesData = [
     {
         //id: 121,
         name: 'Breast cancer - Part 3',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -1339,6 +1460,7 @@ const modulesData = [
     {
         //id: 122,
         name: 'Breast cancer - Part 4',
+        module_number: '',
         description: '',
         letters: 'B',
         version: '1.0.0',
@@ -1350,6 +1472,7 @@ const modulesData = [
     {
         //id: 123,
         name: 'Lung cancer',
+        module_number: '',
         description: '',
         letters: 'L',
         version: '1.0.0',
@@ -1361,6 +1484,7 @@ const modulesData = [
     {
         //id: 124,
         name: 'Candidiasis',
+        module_number: '',
         description: '',
         letters: 'C',
         version: '1.0.0',

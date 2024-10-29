@@ -18,6 +18,10 @@ Modules.init(
             allowNull: false,
             unique: true
         },
+        module_number: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
         description: {
             type: DataTypes.TEXT,
             allowNull: true

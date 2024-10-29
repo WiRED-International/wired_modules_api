@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
         {
           model: Modules,
           as: 'redirectedModule',
-          attributes: ['id', 'name', 'description', 'letters', 'is_downloadable', 'downloadLink']
+          attributes: ['id', 'name', 'module_number', 'description', 'letters', 'is_downloadable', 'downloadLink']
         },
         {
           model: SubCategories,
@@ -88,7 +88,7 @@ router.get('/:id', async (req, res) => {
             {
                 model: Modules,
                 as: 'redirectedModule',
-                attributes: ['id', 'name', 'description', 'letters', 'is_downloadable', 'downloadLink']
+                attributes: ['id', 'name', 'module_number', 'description', 'letters', 'is_downloadable', 'downloadLink']
             },
             {
               model: SubCategories, 
@@ -108,11 +108,12 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-    const { name, description, letters, version, is_downloadable, downloadLink, packageSize, redirect_module_id, } = req.body;
+    const { name, module_number, description, letters, version, is_downloadable, downloadLink, packageSize, redirect_module_id, } = req.body;
   try {
 
     const newModule = await Modules.create({
         name,
+        module_number,
         description,
         letters,
         version,
@@ -129,7 +130,7 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
-    const { name, description, topics, letters, version, is_downloadable, downloadLink, packageSize, redirect_module_id } = req.body;
+    const { name, module_number, description, letters, version, is_downloadable, downloadLink, packageSize, redirect_module_id } = req.body;
   try {
     const module = await Modules.findByPk(req.params.id);
     if (!module) {
@@ -137,6 +138,7 @@ router.put('/:id', async (req, res) => {
     }
     await module.update({
         name: name || module.name,
+        module_number,
         description,
         letters,
         version,
