@@ -9,7 +9,7 @@ router.post('/modules-to-subCategories', async (req, res) => {
     
         await module.addSubCategories(subcategory_id); 
     
-        res.status(200).json({ message: 'Modules associated successfully' });
+        res.status(201).json({ message: 'Modules associated successfully' });
       } catch (error) {
         res.status(500).json({ error: error.message });
       }
@@ -23,7 +23,7 @@ router.post('/subCategories-to-modules', async (req, res) => {
 
     await subCategory.addModules(module_id); 
 
-    res.status(200).json({ message: 'SubCategory associated successfully' });
+    res.status(201).json({ message: 'SubCategory associated successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

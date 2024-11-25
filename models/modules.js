@@ -46,9 +46,11 @@ Modules.init(
             type: DataTypes.INTEGER,
             allowNull: true, 
             references: {
-              model: 'Modules',
+              model: 'modules',
               key: 'id',
             },
+	    onDelete: 'SET NULL',
+	    onUpdate: 'CASCADE',
         },
     }, {
         sequelize,

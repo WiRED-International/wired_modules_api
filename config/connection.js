@@ -9,7 +9,6 @@ let sequelize;
 if (process.env.CLEARDB_DATABASE_URL) {
   sequelize = new Sequelize(process.env.CLEARDB_DATABASE_URL)
 } else{ 
-
   sequelize = new Sequelize(
     process.env.DB_NAME,
     process.env.DB_USER,

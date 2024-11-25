@@ -22,15 +22,17 @@ SubCategories.init(
             type: DataTypes.INTEGER,
             allowNull: false,
             references: {
-              model: 'Categories',
+              model: 'categories',
               key: 'id',
             },
+	    onDelete: 'CASCADE',
+	    onUpdate: 'CASCADE',
         },
     }, {
         sequelize,
         modelName: 'SubCategories',
         tableName: 'subcategories',
-        timestamps: false,
+        timestamps: true,
         freezeTableName: true,
         underscored: true,
     }
