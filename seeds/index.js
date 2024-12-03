@@ -4,6 +4,7 @@ const seedSubCategories = require('./subCategories-seeds');
 const seedModules = require('./modules-seeds');
 const seedPackages = require('./packages-seeds');
 const seedAlerts = require('./alerts-seeds');
+const seedLetters = require('./letters-seeds');
 
 const seed = async () => {
     try {
@@ -34,6 +35,10 @@ const seed = async () => {
         console.log('Seeding alerts...');
         await seedAlerts(); // Seed alerts
         console.log('Alerts seeded.');
+
+        console.log('Seeding letters...');
+        await seedLetters(); // Seed letters
+        console.log('Letters seeded.');
 
         console.log('Seeding completed successfully.');
 

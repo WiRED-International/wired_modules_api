@@ -16,14 +16,6 @@ Categories.init(
             type: DataTypes.STRING,
             allowNull: false
         },
-        // category_id: {
-        //     type: DataTypes.INTEGER,
-        //     allowNull: false,
-        //     references: {
-        //       model: 'Categories',
-        //       key: 'id',
-        //     },
-        // },
     }, {
         sequelize,
         modelName: 'Categories',
