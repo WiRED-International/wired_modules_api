@@ -15,6 +15,10 @@ Alerts.init(
             type: DataTypes.TEXT,
             allowNull: false,
         },
+        important: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+        },
     }, {
         sequelize,
         modelName: 'Alerts',

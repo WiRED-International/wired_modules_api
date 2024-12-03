@@ -2,31 +2,28 @@ const { Model, DataTypes } = require('sequelize');
 
 const sequelize = require('../config/connection');
 
-class Categories extends Model {}
+class Letters extends Model {};
 
-Categories.init(
+Letters.init(
     {
         id: {
             type: DataTypes.INTEGER,
             allowNull: false,
             primaryKey: true,
-            autoIncrement: true,
+            autoIncrement: true
         },
-        name: {
+        letters: {
             type: DataTypes.STRING,
             allowNull: false
         },
     }, {
         sequelize,
-        modelName: 'Categories',
-        tableName: 'categories',
+        modelName: 'Letters',
+        tableName: 'letters',
         timestamps: false,
         freezeTableName: true,
         underscored: true,
     }
 );
 
-// Categories.hasMany(SubCategories, { as: 'subCategories', foreignKey: 'category_id' });
-
-
-module.exports = Categories;
+module.exports = Letters;

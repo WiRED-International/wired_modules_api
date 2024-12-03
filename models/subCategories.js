@@ -38,8 +38,5 @@ SubCategories.init(
     }
 );
 
-// SubCategories.belongsTo(Categories, { as: 'category', foreignKey: 'category_id' });
-
-// SubCategories.belongsToMany(Modules, { as: 'modules', through: 'module_subcategory', foreignKey: 'sub_category_id' });
-
 module.exports = SubCategories;
+

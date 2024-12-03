@@ -38,16 +38,17 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-    const { alert, } = req.body;
   try {
+    const { alert, important } = req.body;
+    if (alert === undefined || important === undefined) {
+      return res.status(400).json({ message: 'Both alert and important fields are required' });
+    }
 
-    const newAlert = await Alerts.create({
-        alert,
-      });
-
-    res.status(201).json({ alert: newAlert });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    const newAlert = await Alerts.create({ alert, important });
+    res.status(201).json(newAlert);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
   }
 });
 
