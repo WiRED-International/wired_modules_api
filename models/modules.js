@@ -18,7 +18,7 @@ Modules.init(
             allowNull: false,
             unique: true
         },
-        module_number: {
+        module_id: {
             type: DataTypes.STRING,
             allowNull: true
         },
@@ -26,17 +26,9 @@ Modules.init(
             type: DataTypes.TEXT,
             allowNull: true
         },
-        letters: {
-            type: DataTypes.STRING,
-            allowNull: false
-        },
         version: {
             type: DataTypes.STRING,
             allowNull: true
-        },
-        is_downloadable: {
-            type: DataTypes.BOOLEAN,
-            defaultValue: false,
         },
         downloadLink: {
             type: DataTypes.STRING,

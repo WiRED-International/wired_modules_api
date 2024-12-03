@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { Modules, SubCategories } = require('../../models');
+const { Modules, SubCategories, Letters } = require('../../models');
 
 router.get('/', async (req, res) => {
   const { subcategoryId } = req.query;
@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
         {
           model: Modules,
           as: 'redirectedModule',
-          attributes: ['id', 'name', 'module_number', 'description', 'letters', 'is_downloadable', 'downloadLink']
+          attributes: ['id', 'name', 'module_id', 'description', 'downloadLink']
         },
         {
           model: SubCategories,
@@ -19,6 +19,11 @@ router.get('/', async (req, res) => {
           through: { attributes: [] },
           // Only apply the `where` clause when subcategoryId is provided
           ...(subcategoryId ? { where: { id: subcategoryId } } : {}),
+        },
+        { 
+          model: Letters, 
+          as: 'letters', 
+          attributes: ['id', 'letters'] 
         },
       ],
     };
@@ -30,57 +35,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// // works for modules by alphaet 
-// router.get('/', async (req, res) => {
-//   try {
-//     const modules = await Modules.findAll({
-//         include: [
-//             {
-//                 model: Modules,
-//                 as: 'redirectedModule',
-//                 attributes: ['id', 'name', 'description', 'letters', 'is_downloadable', 'downloadLink']
-//             },
-//             {
-//               model: SubCategories, 
-//               as: 'subCategories',  
-//               attributes: ['id', 'name', 'category_id'], 
-//               through: { attributes: [] }, 
-//             },
-//         ],
-//     });
-//     res.status(200).json(modules);
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// });
-
-
-// // works for modules by subcategory
-// router.get('/', async (req, res) => {
-//   const { subcategoryId } = req.query;
-//   try {
-//     const modules = await Modules.findAll({
-//         include: [
-//             {
-//                 model: Modules,
-//                 as: 'redirectedModule',
-//                 attributes: ['id', 'name', 'description', 'letters', 'is_downloadable', 'downloadLink']
-//             },
-//             {
-//               model: SubCategories, 
-//               as: 'subCategories',  
-//               where: { id: subcategoryId},
-//               attributes: ['id', 'name', 'category_id'], 
-//               through: { attributes: [] }, 
-//             },
-//         ],
-//     });
-//     res.status(200).json(modules);
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// });
-
 router.get('/:id', async (req, res) => {
   try {
     const module = await Modules.findByPk(req.params.id, {
@@ -88,13 +42,18 @@ router.get('/:id', async (req, res) => {
             {
                 model: Modules,
                 as: 'redirectedModule',
-                attributes: ['id', 'name', 'module_number', 'description', 'letters', 'is_downloadable', 'downloadLink']
+                attributes: ['id', 'name', 'module_id', 'description', 'downloadLink']
             },
             {
               model: SubCategories, 
               as: 'subCategories',  
               attributes: ['id', 'name', 'category_id'], 
               through: { attributes: [] }, 
+            },
+            { 
+              model: Letters, 
+              as: 'letters', 
+              attributes: ['id', 'letters'] 
             },
         ],
     });
@@ -108,19 +67,17 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-    const { name, module_number, description, letters, version, is_downloadable, downloadLink, packageSize, redirect_module_id, } = req.body;
+    const { name, module_id, description, version, downloadLink, packageSize, redirect_module_id, } = req.body;
   try {
 
     const newModule = await Modules.create({
         name,
-        module_number,
+        module_id,
         description,
-        letters,
         version,
-        is_downloadable: Boolean(is_downloadable),
-        downloadLink: is_downloadable ? downloadLink : null,
+        downloadLink,
         packageSize,
-        redirect_module_id: is_downloadable ? null : redirect_module_id,
+        redirect_module_id,
       });
 
     res.status(201).json({ module: newModule });
@@ -130,7 +87,7 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
-    const { name, module_number, description, letters, version, is_downloadable, downloadLink, packageSize, redirect_module_id } = req.body;
+    const { name, module_id, description, version, downloadLink, packageSize, redirect_module_id } = req.body;
   try {
     const module = await Modules.findByPk(req.params.id);
     if (!module) {
@@ -138,14 +95,12 @@ router.put('/:id', async (req, res) => {
     }
     await module.update({
         name: name || module.name,
-        module_number,
+        module_id,
         description,
-        letters,
         version,
-        is_downloadable: Boolean(is_downloadable),
-        downloadLink: is_downloadable ? downloadLink : null,
+        downloadLink,
         packageSize,
-        redirect_module_id: is_downloadable ? null : redirect_module_id,
+        redirect_module_id,
     });
 
     res.status(200).json({ message: "Module updated successfully", module});

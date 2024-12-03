@@ -4,6 +4,7 @@ const alertsData = [
     {
         //id: 1,
         alert: 'This is a default alert message. The message can be updated and deleted from the database. The text color of the alert can also be changed.',
+        important: false,
     },
 ];
 

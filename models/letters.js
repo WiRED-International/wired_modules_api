@@ -1,12 +1,10 @@
 const { Model, DataTypes } = require('sequelize');
 
 const sequelize = require('../config/connection');
-const Categories = require('./categories');
-const Modules = require('./modules');
 
-class SubCategories extends Model {};
+class Letters extends Model {};
 
-SubCategories.init(
+Letters.init(
     {
         id: {
             type: DataTypes.INTEGER,
@@ -14,26 +12,18 @@ SubCategories.init(
             primaryKey: true,
             autoIncrement: true
         },
-        name: {
+        letters: {
             type: DataTypes.STRING,
             allowNull: false
         },
-        category_id: {
-            type: DataTypes.INTEGER,
-            allowNull: false,
-            references: {
-              model: 'Categories',
-              key: 'id',
-            },
-        },
     }, {
         sequelize,
-        modelName: 'SubCategories',
-        tableName: 'subcategories',
+        modelName: 'Letters',
+        tableName: 'letters',
         timestamps: false,
         freezeTableName: true,
         underscored: true,
     }
 );
 
-module.exports = SubCategories;
+module.exports = Letters;

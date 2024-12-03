@@ -13,6 +13,8 @@ const subCategoriesRoutes = require('./controllers/api/subCategoriesRoutes');
 const moduleSubCategoryRoutes = require('./controllers/api/moduleSubCategoryRoutes');
 const packagesRoutes = require('./controllers/api/packagesRoutes');
 const alertsRoutes = require('./controllers/api/alertsRoutes');
+const lettersRoutes = require('./controllers/api/lettersRoutes');
+const moduleLetterRoutes = require('./controllers/api/moduleLetterRoutes');
 
 app.use('/modules', modulesRoutes);
 app.use('/categories', categoriesRoutes);
@@ -21,8 +23,12 @@ app.use('/mts', moduleSubCategoryRoutes);
 app.use('/stm', moduleSubCategoryRoutes);
 app.use('/packages', packagesRoutes);
 app.use('/alerts', alertsRoutes);
+app.use('/letters', lettersRoutes);
+app.use('/mtl', moduleLetterRoutes);
+app.use('/ltm', moduleLetterRoutes);
 
-sequelize.sync({ force: true })
+
+sequelize.sync({ force: false })
   .then(async() => {
     console.log('Database synced');
     app.listen(port, () => console.log('Now listening on: http://localhost:' + port)); 
