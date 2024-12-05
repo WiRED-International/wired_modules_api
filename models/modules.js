@@ -34,6 +34,10 @@ Modules.init(
             type: DataTypes.STRING,
             allowNull: true,
         },
+        language: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
         packageSize: {
             type: DataTypes.STRING,
             allowNull: true

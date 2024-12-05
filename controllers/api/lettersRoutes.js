@@ -8,7 +8,7 @@ router.get('/', async (req, res) => {
             {
                 model: Modules,
                 as: 'modules',
-                attributes: ['id', 'name', 'description', 'downloadLink', 'module_id', 'redirect_module_id'],
+                attributes: ['id', 'name', 'description', 'downloadLink', 'language', 'module_id', 'redirect_module_id'],
                 through: { attributes: [] },
             },
         ],
@@ -28,7 +28,7 @@ router.get('/:id', async (req, res) => {
                 {
                     model: Modules,
                     as: 'modules',
-                    attributes: ['id', 'name', 'description', 'downloadLink','module_id', 'redirect_module_id'],
+                    attributes: ['id', 'name', 'description', 'downloadLink', 'language', 'module_id', 'redirect_module_id'],
                     through: { attributes: [] },
                 },
             ],
