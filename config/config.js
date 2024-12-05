@@ -19,7 +19,7 @@ module.exports = {
     "username": process.env.AWS_DB_USER,
     "password": process.env.AWS_DB_PASS,
     "database": process.env.AWS_DB_NAME,
-    "host": process.env.AWS_DB_HOST,
+    "host": '127.0.0.1',
     "dialect": "mysql"
   }
 }
