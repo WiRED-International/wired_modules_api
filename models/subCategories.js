@@ -32,7 +32,7 @@ SubCategories.init(
         sequelize,
         modelName: 'SubCategories',
         tableName: 'subcategories',
-        timestamps: true,
+        timestamps: false,
         freezeTableName: true,
         underscored: true,
     }
