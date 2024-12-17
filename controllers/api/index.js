@@ -7,6 +7,8 @@ const packagesRoutes = require('./packagesRoutes');
 const alertsRoutes = require('./alertsRoutes');
 const lettersRoutes = require('./lettersRoutes');  
 const moduleLetterRoutes = require('./moduleLetterRoutes');
+const userRoutes = require('./userRoutes');
+const authRoutes = require('./authRoutes');
 
 router.use('/modules', modulesRoutes);
 router.use('/categories', categoriesRoutes);
@@ -18,5 +20,7 @@ router.use('/alerts', alertsRoutes);
 router.use('/letters', lettersRoutes);
 router.use('/modules-to-letters', moduleLetterRoutes);
 router.use('/letters-to-modules', moduleLetterRoutes);
+router.use('/users', userRoutes);
+router.use('/auth', authRoutes);
 
 module.exports = router;
