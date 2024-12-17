@@ -2,30 +2,17 @@ const express = require('express');
 const app = express();
 const sequelize = require('./config/connection');
 const port = process.env.PORT || 3000;
+const auth = require('./middleware/auth');
 require('dotenv').config();
+
+const routes = require('./controllers/api/index');
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const modulesRoutes = require('./controllers/api/modulesRoutes');
-const categoriesRoutes = require('./controllers/api/categoriesRoutes');
-const subCategoriesRoutes = require('./controllers/api/subCategoriesRoutes');
-const moduleSubCategoryRoutes = require('./controllers/api/moduleSubCategoryRoutes');
-const packagesRoutes = require('./controllers/api/packagesRoutes');
-const alertsRoutes = require('./controllers/api/alertsRoutes');
-const lettersRoutes = require('./controllers/api/lettersRoutes');
-const moduleLetterRoutes = require('./controllers/api/moduleLetterRoutes');
+app.use(routes);
 
-app.use('/modules', modulesRoutes);
-app.use('/categories', categoriesRoutes);
-app.use('/subCategories', subCategoriesRoutes);
-app.use('/mts', moduleSubCategoryRoutes);
-app.use('/stm', moduleSubCategoryRoutes);
-app.use('/packages', packagesRoutes);
-app.use('/alerts', alertsRoutes);
-app.use('/letters', lettersRoutes);
-app.use('/mtl', moduleLetterRoutes);
-app.use('/ltm', moduleLetterRoutes);
+app.use('/auth', auth);
 
 sequelize.sync({ force: false })
   .then(async() => {

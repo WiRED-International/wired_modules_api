@@ -2,6 +2,7 @@ const Modules = require('./modules');
 const SubCategories = require('./subCategories');
 const Categories = require('./categories');
 const Letters = require('./letters');
+const Users = require('./users');
 
 Modules.belongsTo(Modules, { as: 'RedirectedModule', foreignKey: 'redirect_module_id' });
 Categories.hasMany(SubCategories, { as: 'subCategories', foreignKey: 'category_id' });
@@ -18,4 +19,5 @@ module.exports = {
   SubCategories,
   Categories,
   Letters,
+  Users,
 };
