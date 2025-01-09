@@ -5,6 +5,9 @@ const seedModules = require('./modules-seeds');
 const seedPackages = require('./packages-seeds');
 const seedAlerts = require('./alerts-seeds');
 const seedLetters = require('./letters-seeds');
+const seedCountries = require('./countries-seeds');
+const seedCities = require('./cities-seeds');
+const seedOrganizations = require('./organizations-seeds');
 
 const seed = async () => {
     try {
@@ -39,6 +42,18 @@ const seed = async () => {
         console.log('Seeding letters...');
         await seedLetters(); // Seed letters
         console.log('Letters seeded.');
+
+        console.log('Seeding countries...');
+        await seedCountries(); // Seed countries
+        console.log('Countries seeded.');
+
+        console.log('Seeding cities...');
+        await seedCities(); // Seed cities
+        console.log('Cities seeded.');
+
+        console.log('Seeding organizations...');
+        await seedOrganizations(); // Seed organizations
+        console.log('Organizations seeded.');
 
         console.log('Seeding completed successfully.');
 

@@ -16,6 +16,7 @@ if (process.env.CLEARDB_DATABASE_URL) {
     {
       host: process.env.DB_HOST,
       dialect: 'mysql',
+      logging: console.log,
       port: 3306
     }
   );
