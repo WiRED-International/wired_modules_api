@@ -9,6 +9,9 @@ const lettersRoutes = require('./lettersRoutes');
 const moduleLetterRoutes = require('./moduleLetterRoutes');
 const userRoutes = require('./userRoutes');
 const authRoutes = require('./authRoutes');
+const countriesRoutes = require('./countriesRoutes');
+const citiesRoutes = require('./citiesRoutes');
+const organizationsRoutes = require('./organizationsRoutes');
 
 router.use('/modules', modulesRoutes);
 router.use('/categories', categoriesRoutes);
@@ -22,5 +25,8 @@ router.use('/modules-to-letters', moduleLetterRoutes);
 router.use('/letters-to-modules', moduleLetterRoutes);
 router.use('/users', userRoutes);
 router.use('/auth', authRoutes);
+router.use('/countries', countriesRoutes);
+router.use('/cities', citiesRoutes);
+router.use('/organizations', organizationsRoutes);
 
 module.exports = router;

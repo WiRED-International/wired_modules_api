@@ -11,7 +11,17 @@ Users.init(
       primaryKey: true,
       autoIncrement: true,
     },
-    username: {
+    // user_id: {
+    //   type: DataTypes.STRING,
+    //   allowNull: false,
+    //   unique: true,
+    // },
+    first_name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+    },
+    last_name: {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
@@ -28,10 +38,34 @@ Users.init(
       type: DataTypes.STRING,
       allowNull: false,
     },
-    is_admin: {
-      type: DataTypes.BOOLEAN,
+    role: {
+      type: DataTypes.ENUM('user', 'admin', 'super_admin'),
       allowNull: false,
-      defaultValue: false,
+      defaultValue: 'user',
+    },
+    country_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'Countries',
+        key: 'id',
+      },
+    },
+    city_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'Cities',
+        key: 'id',
+      },
+    },
+    organization_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'Organizations',
+        key: 'id',
+      },
     },
   },
   {
@@ -41,6 +75,15 @@ Users.init(
     timestamps: true,
     freezeTableName: true,
     underscored: true,
+    // hooks: {
+    //   beforeCreate: async (user) => {
+    //     console.log('Generating user_id...');
+    //     if (!user.user_id) {
+    //       user.user_id = Math.floor(1000000 + Math.random() * 9000000).toString();
+    //     }
+    //     console.log('Generated user_id:', user.user_id);
+    //   },
+    // },  
   }
 );
 

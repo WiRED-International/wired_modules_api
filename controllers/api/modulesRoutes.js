@@ -17,7 +17,6 @@ router.get('/', async (req, res) => {
           as: 'subCategories',
           attributes: ['id', 'name', 'category_id'],
           through: { attributes: [] },
-          // Only apply the `where` clause when subcategoryId is provided
           ...(subcategoryId ? { where: { id: subcategoryId } } : {}),
         },
         { 

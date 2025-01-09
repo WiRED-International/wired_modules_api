@@ -3,12 +3,11 @@ const { Users } = require('../../models');
 const bcrypt = require('bcryptjs');
 const auth = require('../../middleware/auth');
 const isAdmin = require('../../middleware/isAdmin');
-const { increment } = require('../../models/categories');
 
 router.get('/', isAdmin, async (req, res) => {
   try {
     const users = await Users.findAll({
-      attributes: ['id', 'username', 'email', 'is_admin'], 
+      attributes: ['id', 'first_name', 'last_name', 'email', 'role'], 
     });
     res.status(200).json(users);
   } catch (err) {
@@ -22,7 +21,7 @@ router.get('/:id', isAdmin, async (req, res) => {
     const user = await Users.findByPk(
       id, 
       {
-        attributes: ['id', 'username', 'email', 'is_admin'],
+        attributes: ['id', 'first_name', 'last_name', 'email', 'role'],
       },
     );
     if (!user) {
@@ -34,16 +33,19 @@ router.get('/:id', isAdmin, async (req, res) => {
   }
 });
 
-router.put('/', auth, async (req, res) => {
+router.put('/:id', auth, async (req, res) => {
     const { id } = req.user;
-    const { username, password, email } = req.body;
+    const { firstName, lastname, password, email } = req.body;
   try {
     const user = await Users.findByPk(id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    if (username) {
-        user.username = username;
+    if (firstName) {
+        user.firstName = firstName;
+    }
+    if (lastname) {
+        user.lastName = lastname;
     }
     if (password) {
         const salt = await bcrypt.genSalt(10);
@@ -60,7 +62,7 @@ router.put('/', auth, async (req, res) => {
   }
 });
 
-router.delete('/', auth, async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
   try {
     const user = await Users.findByPk(req.user.id);
     if (!user) {

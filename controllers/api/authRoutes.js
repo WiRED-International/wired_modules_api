@@ -7,19 +7,23 @@ require('dotenv').config();
 const secret = process.env.SECRET;
 
 router.post('/register', async (req, res) => {
-    const { username, password, email, is_admin } = req.body;
+    const { first_name, last_name, email, role, country_id, city_id, organization_id, password } = req.body;
   try {
-    const user = await Users.findOne({ where: { username } });
+    const user = await Users.findOne({ where: { email } });
     if (user) {
-      return res.status(400).json({ message: 'Username already exists' });
+      return res.status(400).json({ message: 'email already exists' });
     }
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const newUser = await Users.create({
-        username,
-        password: hashedPassword,
+        first_name,
+        last_name,
         email,
-        is_admin: is_admin || false,
+        role,
+        country_id,
+        city_id,
+        organization_id,
+        password: hashedPassword,
     });
     res.status(201).json({ user: newUser });
   } catch (err) {
@@ -38,7 +42,7 @@ router.post('/login', async (req, res) => {
     if (!valid) {
       return res.status(400).json({ message: 'Invalid username or password' });
     }
-    const token = jwt.sign({ id: user.id, email: user.email, isAdmin: user.is_admin }, secret, {
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role}, secret, {
         expiresIn: '1h',
     });
     res.status(200).json({ message: 'Login successful', token, user });
