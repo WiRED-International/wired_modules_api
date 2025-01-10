@@ -1,17 +1,18 @@
 const router = require('express').Router();
-const modulesRoutes = require('./modulesRoutes');
-const categoriesRoutes = require('./categoriesRoutes');
-const subCategoriesRoutes = require('./subCategoriesRoutes');
-const moduleSubCategoryRoutes = require('./moduleSubCategoryRoutes');
-const packagesRoutes = require('./packagesRoutes');
+const modulesRoutes = require('./moduleRoutes/modulesRoutes');
+const categoriesRoutes = require('./moduleRoutes/categoriesRoutes');
+const subCategoriesRoutes = require('./moduleRoutes/subCategoriesRoutes');
+const moduleSubCategoryRoutes = require('./moduleRoutes/moduleSubCategoryRoutes');
+const packagesRoutes = require('./moduleRoutes/packagesRoutes');
 const alertsRoutes = require('./alertsRoutes');
-const lettersRoutes = require('./lettersRoutes');  
-const moduleLetterRoutes = require('./moduleLetterRoutes');
-const userRoutes = require('./userRoutes');
-const authRoutes = require('./authRoutes');
-const countriesRoutes = require('./countriesRoutes');
-const citiesRoutes = require('./citiesRoutes');
-const organizationsRoutes = require('./organizationsRoutes');
+const lettersRoutes = require('./moduleRoutes/lettersRoutes');  
+const moduleLetterRoutes = require('./moduleRoutes/moduleLetterRoutes');
+const userRoutes = require('./userRoutes/userRoutes');
+const authRoutes = require('./userRoutes/authRoutes');
+const countriesRoutes = require('./userRoutes/countriesRoutes');
+const citiesRoutes = require('./userRoutes/citiesRoutes');
+const organizationsRoutes = require('./userRoutes/organizationsRoutes');
+const adminPermissionsRoutes = require('./userRoutes/adminPermissionsRoutes');
 
 router.use('/modules', modulesRoutes);
 router.use('/categories', categoriesRoutes);
@@ -28,5 +29,6 @@ router.use('/auth', authRoutes);
 router.use('/countries', countriesRoutes);
 router.use('/cities', citiesRoutes);
 router.use('/organizations', organizationsRoutes);
+router.use('/admin-permissions', adminPermissionsRoutes);
 
 module.exports = router;

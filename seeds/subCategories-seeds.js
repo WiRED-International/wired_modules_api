@@ -1,5 +1,5 @@
-const Categories = require('../models/categories');
-const SubCategories = require('../models/subCategories');
+const Categories = require('../models/moduleModels/categories');
+const SubCategories = require('../models/moduleModels/subCategories');
 
 const subCategoriesData = [
     {

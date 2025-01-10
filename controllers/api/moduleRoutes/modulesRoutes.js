@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { Modules, SubCategories, Letters } = require('../../models');
+const { Modules, SubCategories, Letters } = require('../../../models');
 
 router.get('/', async (req, res) => {
   const { subcategoryId } = req.query;

@@ -1,10 +1,25 @@
-const Organizations = require('../models/organizations');
+const Organizations = require('../models/userModels/organizations');
 
 const organizations = [
   {
     name: 'Pandipieri',
     country_id: 1,
+    city_id: 3,
+  },
+  {
+    name: 'Highschool',
+    country_id: 1,
     city_id: 1,
+  },
+  {
+    name: 'Supermarket',
+    country_id: 1,
+    city_id: 3,
+  },
+  {
+    name: 'Maseno University',
+    country_id: 1,
+    city_id: 4,
   },
 ];
 

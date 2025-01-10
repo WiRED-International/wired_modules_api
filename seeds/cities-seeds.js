@@ -1,4 +1,4 @@
-const Cities = require('../models/cities');
+const Cities = require('../models/userModels/cities');
 
 const cities = [
   {
@@ -12,6 +12,10 @@ const cities = [
   {
     name: 'Kisumu',
     country_id: 1,
+  },
+  {
+    name: 'Maseno',
+    country_id: 2,
   },
 ];
 

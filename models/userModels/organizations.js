@@ -1,15 +1,19 @@
 const { Model, DataTypes } = require('sequelize');
-const sequelize = require('../config/connection');
+const sequelize = require('../../config/connection');
 
-class Admins extends Model {}
+class Organizations extends Model {}
 
-Admins.init(
+Organizations.init(
   {
     id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true,
       autoIncrement: true,
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
     },
     country_id: {
       type: DataTypes.INTEGER,
@@ -27,23 +31,15 @@ Admins.init(
         key: 'id',
       },
     },
-    organization_id: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'Organizations',
-        key: 'id',
-      },
-    },
   },
   {
     sequelize,
-    modelName: 'Admins',
-    tableName: 'admins',
-    timestamps: true,
+    modelName: 'Organizations',
+    tableName: 'organizations',
+    timestamps: false,
     freezeTableName: true,
     underscored: true,
   },
 );
 
-module.exports = Admins;
+module.exports = Organizations;

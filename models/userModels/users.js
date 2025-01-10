@@ -1,5 +1,5 @@
 const { Model, DataTypes } = require('sequelize');
-const sequelize = require('../config/connection');
+const sequelize = require('../../config/connection');
 
 class Users extends Model {}
 
@@ -11,20 +11,15 @@ Users.init(
       primaryKey: true,
       autoIncrement: true,
     },
-    // user_id: {
-    //   type: DataTypes.STRING,
-    //   allowNull: false,
-    //   unique: true,
-    // },
     first_name: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
+      unique: false,
     },
     last_name: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
+      unique: false,
     },
     email: {
       type: DataTypes.STRING,
@@ -74,16 +69,7 @@ Users.init(
     tableName: 'users',
     timestamps: true,
     freezeTableName: true,
-    underscored: true,
-    // hooks: {
-    //   beforeCreate: async (user) => {
-    //     console.log('Generating user_id...');
-    //     if (!user.user_id) {
-    //       user.user_id = Math.floor(1000000 + Math.random() * 9000000).toString();
-    //     }
-    //     console.log('Generated user_id:', user.user_id);
-    //   },
-    // },  
+    underscored: true, 
   }
 );
 

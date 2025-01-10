@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { Modules, Letters } = require('../../models');
+const { Modules, Letters } = require('../../../models');
 
 router.post('/modules-to-letters', async (req, res) => {
     const { module_id, letter_id } = req.body;
