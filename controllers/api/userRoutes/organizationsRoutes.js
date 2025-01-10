@@ -1,9 +1,22 @@
 const router = require('express').Router();
-const { Organizations } = require('../../models');
+const { Organizations, Countries, Cities } = require('../../../models');
 
 router.get('/', async (req, res) => {
   try {
-    const organizations = await Organizations.findAll();
+    const organizations = await Organizations.findAll({
+      include: [
+        {
+          model: Countries,
+          as: 'country',
+          attributes: ['id', 'name'],
+        },
+        {
+          model: Cities,
+          as: 'cities',
+          attributes: ['id', 'name'],
+        },
+      ],
+    });
     res.status(200).json(organizations);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -12,7 +25,23 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const organization = await Organizations.findByPk(req.params.id);
+    const organization = await Organizations.findByPk(
+      req.params.id,
+      {
+        include: [
+          {
+            model: Countries,
+            as: 'country',
+            attributes: ['id', 'name'],
+          },
+          {
+            model: Cities,
+            as: 'cities',
+            attributes: ['id', 'name'],
+          },
+        ],
+      }
+    );
     if (!organization) {
       return res.status(404).json({ message: 'Organization not found' });
     }

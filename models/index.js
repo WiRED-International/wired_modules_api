@@ -1,13 +1,13 @@
-const Modules = require('./modules');
-const SubCategories = require('./subCategories');
-const Categories = require('./categories');
-const Letters = require('./letters');
+const Modules = require('./moduleModels/modules');
+const SubCategories = require('./moduleModels/subCategories');
+const Categories = require('./moduleModels/categories');
+const Letters = require('./moduleModels/letters');
 const Alerts = require('./alerts');
-const Countries = require('./countries');
-const Cities = require('./cities');
-const Organizations = require('./organizations');
-const Users = require('./users');
-const Admins = require('./admins');
+const Countries = require('./userModels/countries');
+const Cities = require('./userModels/cities');
+const Organizations = require('./userModels/organizations');
+const Users = require('./userModels/users');
+const AdminPermissions = require('./userModels/adminPermissions');
 
 Modules.belongsTo(Modules, { as: 'RedirectedModule', foreignKey: 'redirect_module_id' });
 
@@ -29,11 +29,23 @@ Cities.hasMany(Users, { as: 'users', foreignKey: 'city_id' });
 Users.belongsTo(Organizations, { as: 'organization', foreignKey: 'organization_id' });
 Organizations.hasMany(Users, { as: 'users', foreignKey: 'organization_id' });
 
-Admins.belongsTo(Organizations, { as: 'organization', foreignKey: 'organization_id' });
-Organizations.hasMany(Admins, { as: 'admins', foreignKey: 'organization_id' });
+Countries.hasMany(Cities, { as: 'cities', foreignKey: 'country_id' });
+Cities.belongsTo(Countries, { as: 'country', foreignKey: 'country_id' });
 
+Countries.hasMany(Organizations, { as: 'organizations', foreignKey: 'country_id' });
+Organizations.belongsTo(Countries, { as: 'country', foreignKey: 'country_id' });
 
+Cities.hasMany(Organizations, { as: 'organizations', foreignKey: 'city_id' });
+Organizations.belongsTo(Cities, { as: 'cities', foreignKey: 'city_id' });
 
+AdminPermissions.belongsTo(Users, { as: 'admin', foreignKey: 'admin_id' });
+Users.hasMany(AdminPermissions, { as: 'admin_permissions', foreignKey: 'admin_id' });
+
+AdminPermissions.belongsTo(Countries, { as: 'country', foreignKey: 'country_id' });
+
+AdminPermissions.belongsTo(Cities, { as: 'city', foreignKey: 'city_id' });
+
+AdminPermissions.belongsTo(Organizations, { as: 'organization', foreignKey: 'organization_id' });
 
 
 module.exports = {
@@ -46,5 +58,5 @@ module.exports = {
   Cities,
   Organizations,
   Users,
-  Admins,
+  AdminPermissions,
 };

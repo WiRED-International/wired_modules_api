@@ -8,6 +8,7 @@ const seedLetters = require('./letters-seeds');
 const seedCountries = require('./countries-seeds');
 const seedCities = require('./cities-seeds');
 const seedOrganizations = require('./organizations-seeds');
+const seedUsers = require('./users-seeds');
 
 const seed = async () => {
     try {
@@ -54,6 +55,10 @@ const seed = async () => {
         console.log('Seeding organizations...');
         await seedOrganizations(); // Seed organizations
         console.log('Organizations seeded.');
+
+        console.log('Seeding users...');
+        await seedUsers(); // Seed users
+        console.log('Users seeded.');
 
         console.log('Seeding completed successfully.');
 

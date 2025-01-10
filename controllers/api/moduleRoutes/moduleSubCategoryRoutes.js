@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { Modules, SubCategories } = require('../../models');
+const { Modules, SubCategories } = require('../../../models');
 
 router.post('/modules-to-subCategories', async (req, res) => {
     const { module_id, subcategory_id } = req.body;

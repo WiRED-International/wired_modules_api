@@ -1,9 +1,9 @@
 const { Model, DataTypes } = require('sequelize');
-const sequelize = require('../config/connection');
+const sequelize = require('../../config/connection');
 
-class Organizations extends Model {}
+class Cities extends Model {}
 
-Organizations.init(
+Cities.init(
   {
     id: {
       type: DataTypes.INTEGER,
@@ -23,23 +23,15 @@ Organizations.init(
         key: 'id',
       },
     },
-    city_id: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'Cities',
-        key: 'id',
-      },
-    },
   },
   {
     sequelize,
-    modelName: 'Organizations',
-    tableName: 'organizations',
+    modelName: 'Cities',
+    tableName: 'cities',
     timestamps: false,
     freezeTableName: true,
     underscored: true,
-  },
+  }
 );
 
-module.exports = Organizations;
+module.exports = Cities;

@@ -1,4 +1,4 @@
-const Countries = require('../models/countries');
+const Countries = require('../models/userModels/countries');
 
 const countries = [
   {

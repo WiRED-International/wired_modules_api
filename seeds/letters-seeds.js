@@ -1,4 +1,4 @@
-const Letters = require('../models/letters');
+const Letters = require('../models/moduleModels/letters');
 
 const lettersData = [
     {
