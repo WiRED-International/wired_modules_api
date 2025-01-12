@@ -21,28 +21,37 @@ AdminPermissions.init(
       onDelete: 'CASCADE',
     },
     country_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        references: {
-          model: 'countries', 
-          key: 'id',
-        },
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'countries', 
+        key: 'id',
       },
-      city_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        references: {
-          model: 'cities', 
-          key: 'id',
-        },
+    },
+    city_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'cities', 
+        key: 'id',
       },
-      organization_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        references: {
-          model: 'organizations', 
-          key: 'id',
-        },
+    },
+    organization_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'organizations', 
+        key: 'id',
+      },
+    },
+    role_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'roles', 
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
     },
   },
   {

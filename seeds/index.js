@@ -8,7 +8,10 @@ const seedLetters = require('./letters-seeds');
 const seedCountries = require('./countries-seeds');
 const seedCities = require('./cities-seeds');
 const seedOrganizations = require('./organizations-seeds');
+const seedRoles = require('./roles-seeds');
 const seedUsers = require('./users-seeds');
+const seedAdminPermissions = require('./adminPermissions-seeds');
+
 
 const seed = async () => {
     try {
@@ -56,10 +59,18 @@ const seed = async () => {
         await seedOrganizations(); // Seed organizations
         console.log('Organizations seeded.');
 
+        console.log('Seeding roles...');
+        await seedRoles(); // Seed roles
+        console.log('Roles seeded.');
+
         console.log('Seeding users...');
         await seedUsers(); // Seed users
         console.log('Users seeded.');
 
+        console.log('Seeding admin permissions...');
+        await seedAdminPermissions(); // Seed admin permissions
+        console.log('Admin permissions seeded.');
+  
         console.log('Seeding completed successfully.');
 
     } catch (error) {

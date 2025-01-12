@@ -7,7 +7,7 @@ require('dotenv').config();
 const secret = process.env.SECRET;
 
 router.post('/register', async (req, res) => {
-    const { first_name, last_name, email, role, country_id, city_id, organization_id, password } = req.body;
+    const { first_name, last_name, email, role_id, country_id, city_id, organization_id, password } = req.body;
   try {
     const user = await Users.findOne({ where: { email } });
     if (user) {
@@ -19,7 +19,7 @@ router.post('/register', async (req, res) => {
         first_name,
         last_name,
         email,
-        role,
+        role_id,
         country_id,
         city_id,
         organization_id,
@@ -42,9 +42,15 @@ router.post('/login', async (req, res) => {
     if (!valid) {
       return res.status(400).json({ message: 'Invalid username or password' });
     }
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role}, secret, {
-        expiresIn: '1h',
-    });
+    const token = jwt.sign(
+      { 
+        id: user.id, 
+        email: user.email, 
+        roleId: user.role_id
+      }, 
+      secret, 
+      { expiresIn: '1h' }
+    );
     res.status(200).json({ message: 'Login successful', token, user });
   } catch (err) {
     res.status(500).json({ message: err.message });

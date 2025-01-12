@@ -6,8 +6,10 @@ const Alerts = require('./alerts');
 const Countries = require('./userModels/countries');
 const Cities = require('./userModels/cities');
 const Organizations = require('./userModels/organizations');
+const Roles = require('./userModels/roles');
 const Users = require('./userModels/users');
 const AdminPermissions = require('./userModels/adminPermissions');
+
 
 Modules.belongsTo(Modules, { as: 'RedirectedModule', foreignKey: 'redirect_module_id' });
 
@@ -29,6 +31,9 @@ Cities.hasMany(Users, { as: 'users', foreignKey: 'city_id' });
 Users.belongsTo(Organizations, { as: 'organization', foreignKey: 'organization_id' });
 Organizations.hasMany(Users, { as: 'users', foreignKey: 'organization_id' });
 
+Users.belongsTo(Roles, { as: 'role', foreignKey: 'role_id' });
+Roles.hasMany(Users, { as: 'users', foreignKey: 'role_id' });
+
 Countries.hasMany(Cities, { as: 'cities', foreignKey: 'country_id' });
 Cities.belongsTo(Countries, { as: 'country', foreignKey: 'country_id' });
 
@@ -47,6 +52,8 @@ AdminPermissions.belongsTo(Cities, { as: 'city', foreignKey: 'city_id' });
 
 AdminPermissions.belongsTo(Organizations, { as: 'organization', foreignKey: 'organization_id' });
 
+AdminPermissions.belongsTo(Roles, { as: 'role', foreignKey: 'role_id' });
+
 
 module.exports = {
   Modules,
@@ -57,6 +64,8 @@ module.exports = {
   Countries,
   Cities,
   Organizations,
+  Roles,
   Users,
   AdminPermissions,
+  
 };
