@@ -1,7 +1,10 @@
 const { Model, DataTypes } = require('sequelize');
 const sequelize = require('../../config/connection');
+const bcrypt = require('bcryptjs');
 
 class Users extends Model {}
+
+const saltRounds = 10;
 
 Users.init(
   {
@@ -79,6 +82,19 @@ Users.init(
     timestamps: true,
     freezeTableName: true,
     underscored: true, 
+    hooks: {
+      // Hash password before saving or updating
+      beforeSave: async (user) => {
+        if (user.changed('password')) {
+          user.password = await bcrypt.hash(user.password, saltRounds);
+        }
+      },
+      beforeUpdate: async (user) => {
+        if (user.changed('password')) {
+          user.password = await bcrypt.hash(user.password, saltRounds);
+        }
+      },
+    },
   }
 );
 

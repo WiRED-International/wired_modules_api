@@ -102,20 +102,50 @@ const users = [
     city_id: 1,
     organization_id: 1,
   },
+  {
+    first_name: "Michael",
+    last_name: "Seaman",
+    email: "mike1@mike.com",
+    password: "password",
+    role_id: 3,
+    country_id: 2,
+    city_id: 1,
+    organization_id: 1,
+  },
+  {
+    first_name: "Jenna",
+    last_name: "Seaman",
+    email: "jenna@jenna.com",
+    password: "password",
+    role_id: 1,
+    country_id: null,
+    city_id: null,
+    organization_id: 1,
+  },
+  {
+    first_name: "Dave",
+    last_name: "West",
+    email: "dave@dave.com",
+    password: "password",
+    role_id: 2,
+    country_id: 1,
+    city_id: 1,
+    organization_id: 1,
+  },
 ];
 
 const usersSeed = async () => {
   try {
     // Hash passwords for all users
-    const hashedUsers = await Promise.all(
-      users.map(async (user) => {
-        const hashedPassword = await bcrypt.hash(user.password, 10); // Salt rounds set to 10
-        return { ...user, password: hashedPassword };
-      })
-    );
+    // const hashedUsers = await Promise.all(
+    //   users.map(async (user) => {
+    //     const hashedPassword = await bcrypt.hash(user.password, 10); // Salt rounds set to 10
+    //     return { ...user, password: hashedPassword };
+    //   })
+    // );
 
     // Seed users with hashed passwords
-    await Users.bulkCreate(hashedUsers);
+    await Users.bulkCreate(users, { individualHooks: true });
     console.log('Users seeded successfully!');
   } catch (err) {
     console.error('Error seeding users:', err);

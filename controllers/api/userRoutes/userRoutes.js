@@ -20,7 +20,7 @@ router.get('/', auth, isAdmin, async (req, res) => {
     const users = await Users.findAll({
       where,
       attributes: ['id', 'first_name', 'last_name', 'email'],
-      include: [{ model: Roles, as: 'role', attributes: ['name'] }],
+      include: [{ model: Roles, as: 'role', attributes: ['id', 'name'] }],
     });
 
     res.status(200).json(users);
@@ -29,7 +29,7 @@ router.get('/', auth, isAdmin, async (req, res) => {
   }
 });
 
-router.get('/:id', isAdmin, async (req, res) => {
+router.get('/:id', auth, isAdmin, async (req, res) => {
   const { id } = req.user;
   try {
     const user = await Users.findByPk(
@@ -62,40 +62,83 @@ router.get('/:id', isAdmin, async (req, res) => {
   }
 });
 
+
+
 router.put('/:id', auth, async (req, res) => {
-  const { id } = req.params; 
-  const requesterId = req.user.id; 
-  const requesterRoleId = req.user.roleId;
-  const { firstName, lastName, email, roleId } = req.body;
+  const userId = req.user.id; // Authenticated user's ID
+  const { id: targetUserId } = req.params; // Target user ID
+  const updatedData = req.body; // Data to update
 
   try {
-    const user = await Users.findByPk(id);
+    // Fetch the authenticated user
+    const user = await Users.findByPk(userId);
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'Authenticated user not found' });
     }
 
-    // Restrict non-admins to only update their own data
-    if (requesterRoleId !== 2 && requesterId !== parseInt(id)) {
-      return res.status(403).json({ message: 'Access denied' });
+    // Fetch the target user
+    const targetUser = await Users.findByPk(targetUserId);
+
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Target user not found' });
     }
 
-    // Update allowed fields
-    if (firstName) user.first_name = firstName;
-    if (lastName) user.last_name = lastName;
-    if (email) user.email = email;
-
-    // Update role if user is a super admin
-    if (roleId && requesterRoleId === 3) {
-      const role = await Roles.findByPk(roleId);
-      if (!role) {
-        return res.status(400).json({ message: 'Invalid role ID' });
+    // Restrict modifications based on user roles
+    if (updatedData.role_id !== undefined) {
+      if (user.role_id === 1) {
+        // Role 1: Cannot modify any role_id
+        return res.status(403).json({
+          message: 'You do not have permission to modify role_id',
+        });
+      } else if (user.role_id === 2) {
+        // Role 2: Can only modify users within the same organization and set role_id 1 or 2
+        if (user.organization_id !== targetUser.organization_id) {
+          return res.status(403).json({
+            message: 'You can only modify users within your organization',
+          });
+        }
+        if (![1, 2].includes(updatedData.role_id)) {
+          return res.status(403).json({
+            message: 'You can only assign role_id 1 or 2 to users within your organization',
+          });
+        }
+      } else if (user.role_id === 3) {
+        // Role 3: Can modify anyone's role_id to 1, 2, or 3
+        if (![1, 2, 3].includes(updatedData.role_id)) {
+          return res.status(400).json({
+            message: 'Invalid role_id. Must be 1, 2, or 3',
+          });
+        }
+      } else {
+        return res.status(403).json({
+          message: 'Authenticated user role id not recognized',
+        });
       }
-      user.role_id = roleId;
     }
 
-    await user.save();
-    res.status(200).json({ message: 'User updated successfully', user });
+
+    // Ensure only allowed fields are updated
+    const allowedUpdates = ['first_name', 'last_name', 'email', 'password', 'role_id', 'country_id', 'city_id', 'organization_id'];
+    const filteredUpdates = Object.keys(updatedData)
+      .filter((key) => allowedUpdates.includes(key))
+      .reduce((obj, key) => {
+        obj[key] = updatedData[key];
+        return obj;
+      }, {});
+
+    // Perform the update
+    await targetUser.update(filteredUpdates);
+
+    // Fetch the updated user with excluded sensitive fields
+    const updatedUser = await Users.findByPk(targetUserId, {
+      attributes: { exclude: ['password'] }, // Exclude sensitive fields
+    });
+
+    res.status(200).json({
+      message: 'User updated successfully',
+      user: updatedUser,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

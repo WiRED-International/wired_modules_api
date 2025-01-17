@@ -1,6 +1,5 @@
 const router = require('express').Router();
-const { AdminPermissions } = require('../../../models');
-const isAdmin = require('../../../middleware/isAdmin');
+const { AdminPermissions, Users, Roles } = require('../../../models');
 const isSuperAdmin = require('../../../middleware/isSuperAdmin');
 
 router.get('/', isSuperAdmin, async (req, res) => {
@@ -19,7 +18,19 @@ router.get('/', isSuperAdmin, async (req, res) => {
 
         const permissions = await AdminPermissions.findAll({
             where,
-            attributes: ['id', 'country_id', 'city_id', 'organization_id', 'role_id'],
+            attributes: ['id', 'country_id', 'city_id', 'organization_id', 'role_id', 'admin_id'],
+            include: [
+                {
+                    model: Users, // Assuming you have a User model
+                    as: 'admin', //this matches the alias in the associations
+                    attributes: ['first_name', 'last_name'], // Adjust field names as necessary
+                },
+                {
+                    model: Roles, // Assuming you have a Role model
+                    as: 'role', //this matches the alias in the associations
+                    attributes: ['name'], // Adjust field names as necessary
+                },
+            ],
         });
 
         res.status(200).json(permissions);

@@ -39,6 +39,12 @@ Organizations.init(
     timestamps: false,
     freezeTableName: true,
     underscored: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ['name', 'country_id', 'city_id'], // Allows organizations to have duplicate names, but not if they have the same country_id and city_id as an existing entry
+      },
+    ],
   },
 );
 
