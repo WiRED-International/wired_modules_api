@@ -23,7 +23,18 @@ router.post('/register', async (req, res) => {
         organization_id,
         password
     });
-    res.status(201).json({ user: newUser });
+    const token = jwt.sign(
+      { 
+        id: newUser.id, 
+        email: newUser.email, 
+        roleId: newUser.role_id,
+        //adding organization_id to the token so it can be used in certain queries
+        organization_id: newUser.organization_id,
+      }, 
+      secret, 
+      { expiresIn: '1h' }
+    );
+    res.status(201).json({ user: newUser, token });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -44,7 +55,9 @@ router.post('/login', async (req, res) => {
       { 
         id: user.id, 
         email: user.email, 
-        roleId: user.role_id
+        roleId: user.role_id,
+        //adding organization_id to the token so it can be used in certain queries
+        organization_id: user.organization_id,
       }, 
       secret, 
       { expiresIn: '1h' }
@@ -58,6 +71,7 @@ router.post('/login', async (req, res) => {
 router.post('/logout', (req, res) => {
   // Optional: Invalidate token on the client-side by removing it from storage
   // Server-side, tokens are typically stateless and don't need invalidation.
+  // Logout function on the front end will likely just remove the token from client storage
   res.status(200).json({ message: 'Logout successful' });
 });
 

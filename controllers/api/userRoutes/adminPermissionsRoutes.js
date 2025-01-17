@@ -5,8 +5,6 @@ const isSuperAdmin = require('../../../middleware/isSuperAdmin');
 router.get('/', isSuperAdmin, async (req, res) => {
     const { adminId, countryId, cityId, organizationId, roleId } = req.query;
 
-    console.log('Query Parameters:', req.query);
-
     try {
         const where = {
             ...(adminId && { admin_id: adminId }),

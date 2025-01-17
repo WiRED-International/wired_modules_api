@@ -136,15 +136,7 @@ const users = [
 
 const usersSeed = async () => {
   try {
-    // Hash passwords for all users
-    // const hashedUsers = await Promise.all(
-    //   users.map(async (user) => {
-    //     const hashedPassword = await bcrypt.hash(user.password, 10); // Salt rounds set to 10
-    //     return { ...user, password: hashedPassword };
-    //   })
-    // );
 
-    // Seed users with hashed passwords
     await Users.bulkCreate(users, { individualHooks: true });
     console.log('Users seeded successfully!');
   } catch (err) {

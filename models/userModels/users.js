@@ -89,11 +89,6 @@ Users.init(
           user.password = await bcrypt.hash(user.password, saltRounds);
         }
       },
-      beforeUpdate: async (user) => {
-        if (user.changed('password')) {
-          user.password = await bcrypt.hash(user.password, saltRounds);
-        }
-      },
     },
   }
 );
