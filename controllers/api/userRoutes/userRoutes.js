@@ -218,6 +218,12 @@ router.put('/:id', auth, async (req, res) => {
         message: 'You cannot update a user with role_id 3',
       });
     }
+    // If admin is updating a user, they can only update users within their organization
+    if (user.role_id === 2 && user.organization_id !== targetUser.organization_id) {
+      return res.status(403).json({
+        message: 'You can only update users within your organization',
+      })
+    }
 
 
     // Ensure only allowed fields are updated
@@ -253,7 +259,6 @@ router.delete('/:id', auth, async (req, res) => {
   try {
     // Fetch the authenticated user
     const user = await Users.findByPk(userId);
-    console.log('user role_id:', user.role_id);
 
     if (!user) {
       return res.status(404).json({ message: 'Authenticated user not found' });
@@ -275,17 +280,18 @@ router.delete('/:id', auth, async (req, res) => {
     }
 
     else if (user.role_id === 2) {
+      if (user.organization_id !== targetUser.organization_id) {
+        return res.status(403).json({
+          message: 'You can only delete users within your organization',
+        });
+      }
       // Role 2: Can only delete role 1 users within the same organization
       if (targetUser.role_id !== 1) {
         return res.status(403).json({
           message: 'You can only delete users with role 1',
         });
       }
-      if (user.organization_id !== targetUser.organization_id) {
-        return res.status(403).json({
-          message: 'You can only delete users within your organization',
-        });
-      }
+
     }
 
     else if (user.role_id === 3) {

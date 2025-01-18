@@ -19,14 +19,14 @@ router.get('/', isSuperAdmin, async (req, res) => {
             attributes: ['id', 'country_id', 'city_id', 'organization_id', 'role_id', 'admin_id'],
             include: [
                 {
-                    model: Users, // Assuming you have a User model
+                    model: Users, 
                     as: 'admin', //this matches the alias in the associations
-                    attributes: ['first_name', 'last_name'], // Adjust field names as necessary
+                    attributes: ['first_name', 'last_name'], 
                 },
                 {
-                    model: Roles, // Assuming you have a Role model
+                    model: Roles, 
                     as: 'role', //this matches the alias in the associations
-                    attributes: ['name'], // Adjust field names as necessary
+                    attributes: ['name'], 
                 },
             ],
         });
