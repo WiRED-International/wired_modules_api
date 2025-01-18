@@ -1,9 +1,19 @@
 const router = require('express').Router();
 const { Countries } = require('../../../models');
+const { Op } = require('sequelize');
+
 
 router.get('/', async (req, res) => {
+  const { query } = req.query;
   try {
-    const countries = await Countries.findAll();
+    const countries = await Countries.findAll({
+      where: {
+        name: {
+          [Op.like]: `${query}%`,
+        },
+      },
+      attributes: ['id', 'name'],
+    });
     res.status(200).json(countries);
   } catch (err) {
     res.status(500).json({ message: err.message });
