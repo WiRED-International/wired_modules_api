@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { Users } = require('../../../models');
+const { Users, Countries } = require('../../../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
@@ -13,8 +13,18 @@ router.post('/register', async (req, res) => {
     if (user) {
       return res.status(400).json({ message: 'email already exists' });
     }
+
+    // Validate the provided country_id
+    if (country_id) {
+      const country = await Countries.findByPk(country_id);
+      if (!country) {
+        return res.status(400).json({ message: 'Invalid country ID' });
+      }
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+
     const newUser = await Users.create({
         first_name,
         last_name,
