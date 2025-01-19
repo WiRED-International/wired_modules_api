@@ -176,58 +176,32 @@ router.put('/:id', auth, async (req, res) => {
 
     // Restrict modifications based on user roles
     if (updatedData.role_id !== undefined) {
-      if(!validRoles.includes(updatedData.role_id)){
-        return res.status(400).json({ message: 'Invalid role_id provided for user being updated' });
-      }
       if(!validRoles.includes(user.role_id)){
         return res.status(403).json({
           message: 'Authenticated user role id not recognized',
         });
       }
-      if (user.role_id === 1) {
+      if(!validRoles.includes(updatedData.role_id)){
+        return res.status(400).json({ message: 'Invalid role_id provided for user being updated' });
+      }
+      if (user.role_id === 1 || user.role_id === 2) {
         // Role 1: Cannot modify any role_id
         return res.status(403).json({
-          message: 'You do not have permission to modify role_id',
+          message: 'You do not have permission to modify role_id, contact a system admin',
         });
-      } else if (user.role_id === 2) {
-        // Role 2: Can only modify users within the same organization and set role_id 1 or 2
-        if (user.organization_id !== targetUser.organization_id) {
-          return res.status(403).json({
-            message: 'You can only modify users within your organization',
-          });
-        }
-        // Prevent Role 2 from updating a user with role_id 3
-
-        if (updatedData.role_id !== 2) {
-          return res.status(403).json({
-            message: 'You can only assign role_id 2 (admin) to users. If you need to remove admin permissions from a user, please contact your system administrator',
-          });
-        }
       } 
     }
 
     // Additional restriction for role_id 1: Only allow them to update themselves
-    if (user.role_id === 1 && userId !== targetUserId) {
+    if ((user.role_id === 1 || user.role_id === 2) && userId !== targetUserId) {
       return res.status(403).json({
-        message: 'Role 1 users can only update their own data',
+        message: 'You are only permitted to update your own user details',
       });
-    }
-    // Additional restriction for role_id 2: Cannot update role_id 3
-    if (user.role_id === 2 && targetUser.role_id === 3) {
-      return res.status(403).json({
-        message: 'You cannot update a user with role_id 3',
-      });
-    }
-    // If admin is updating a user, they can only update users within their organization
-    if (user.role_id === 2 && user.organization_id !== targetUser.organization_id) {
-      return res.status(403).json({
-        message: 'You can only update users within your organization',
-      })
     }
 
 
     // Ensure only allowed fields are updated
-    const allowedUpdates = ['first_name', 'last_name', 'email', 'password', 'role_id', 'country_id', 'city_id', 'organization_id'];
+    const allowedUpdates = ['first_name', 'last_name', 'email', 'password', user.role_id === 3 ? 'role_id' : null, 'country_id', 'city_id', 'organization_id'];
     const filteredUpdates = Object.keys(updatedData)
       .filter((key) => allowedUpdates.includes(key))
       .reduce((obj, key) => {
@@ -272,35 +246,10 @@ router.delete('/:id', auth, async (req, res) => {
     }
 
     // Role-based deletion rules
-    if (user.role_id === 1) {
+    if (user.role_id !== 3) {
       // Role 1: No permission to delete anyone
       return res.status(403).json({
         message: 'You do not have permission to delete users',
-      });
-    }
-
-    else if (user.role_id === 2) {
-      if (user.organization_id !== targetUser.organization_id) {
-        return res.status(403).json({
-          message: 'You can only delete users within your organization',
-        });
-      }
-      // Role 2: Can only delete role 1 users within the same organization
-      if (targetUser.role_id !== 1) {
-        return res.status(403).json({
-          message: 'You can only delete users with role 1',
-        });
-      }
-
-    }
-
-    else if (user.role_id === 3) {
-      // Role 3: Super Admin can delete anyone
-      // No additional checks needed for super admin
-    } else {
-      // Fallback for undefined roles
-      return res.status(403).json({
-        message: 'Authenticated user role id not recognized',
       });
     }
 
