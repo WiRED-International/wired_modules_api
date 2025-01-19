@@ -50,7 +50,7 @@ router.post('/register', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
+  const { email, password, context } = req.body; // Add "context" to the request body to detect if the request is coming from the general app or the admin dashboard
   try {
     const user = await Users.findOne({ where: { email } });
     if (!user) {
@@ -60,6 +60,11 @@ router.post('/login', async (req, res) => {
     if (!valid) {
       return res.status(400).json({ message: 'Invalid username or password' });
     }
+    //if the request is coming from the admin dashboard, check if the user is a super admin and deny access if not
+    if (context === 'admin' && user.role_id !== 3) {
+      return res.status(403).json({ message: 'Access denied: super admin required' });
+    }
+
     const token = jwt.sign(
       { 
         id: user.id, 
