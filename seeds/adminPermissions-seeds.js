@@ -8,6 +8,13 @@ const adminPermissions = [
     organization_id: 1,
     role_id: 1,
   },
+  {
+    admin_id: 8,
+    country_id: 2,
+    city_id: 3,
+    organization_id: 1,
+    role_id: 1,
+  },
 ];
 
 const adminPermissionsSeed = async () => {

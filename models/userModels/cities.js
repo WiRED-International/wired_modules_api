@@ -31,6 +31,12 @@ Cities.init(
     timestamps: false,
     freezeTableName: true,
     underscored: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ["name", "country_id"], // alows duplicate city names, but only if they have unique country ids.  Name comparisons appear to be case-insensitive 
+      },
+    ],
   }
 );
 
