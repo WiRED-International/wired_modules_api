@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { Users, Roles } = require('../../../models');
+const { Users, Roles, QuizScores, Modules } = require('../../../models');
 const bcrypt = require('bcryptjs');
 const auth = require('../../../middleware/auth');
 const isAdmin = require('../../../middleware/isAdmin');
@@ -24,6 +24,37 @@ router.get('/', auth, isAdmin, async (req, res) => {
     });
 
     res.status(200).json(users);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get('/me', auth, async (req, res) => {
+  try {
+    // Fetch the authenticated user's details
+    const user = await Users.findByPk(req.user.id, {
+      attributes: ['id', 'first_name', 'last_name', 'email'], 
+      include: [
+        { 
+          model: QuizScores, 
+          as: 'quizScores', 
+          attributes: ['score', 'date_taken'],
+          include: [
+            {
+              model: Modules, 
+              as: 'module', 
+              attributes: ['id', 'name', 'module_id',],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json(user);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -61,6 +92,8 @@ router.get('/:id', isAdmin, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+
 
 router.put('/:id', auth, async (req, res) => {
   const { id } = req.params; 
