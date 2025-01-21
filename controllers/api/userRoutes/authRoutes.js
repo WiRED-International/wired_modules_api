@@ -2,7 +2,6 @@ const router = require('express').Router();
 const { Users, Countries } = require('../../../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-require('dotenv').config();
 
 const secret = process.env.SECRET;
 
@@ -30,6 +29,7 @@ router.post('/register', async (req, res) => {
         country_id,
         city_id,
         organization_id,
+        //password is hashed before being stored in the database, using a hook in the User model
         password
     });
     const token = jwt.sign(
@@ -59,10 +59,6 @@ router.post('/login', async (req, res) => {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
       return res.status(400).json({ message: 'Invalid username or password' });
-    }
-    //if the request is coming from the admin dashboard, check if the user is a super admin and deny access if not
-    if (context === 'admin' && user.role_id !== 3) {
-      return res.status(403).json({ message: 'Access denied: super admin required' });
     }
 
     const token = jwt.sign(
