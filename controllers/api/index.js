@@ -14,6 +14,7 @@ const countriesRoutes = require('./userRoutes/countriesRoutes');
 const citiesRoutes = require('./userRoutes/citiesRoutes');
 const organizationsRoutes = require('./userRoutes/organizationsRoutes');
 const adminPermissionsRoutes = require('./userRoutes/adminPermissionsRoutes');
+const quizScoreRoutes = require('./moduleRoutes/quizScoreRoutes');
 
 
 router.use('/modules', modulesRoutes);
@@ -33,6 +34,7 @@ router.use('/countries', countriesRoutes);
 router.use('/cities', citiesRoutes);
 router.use('/organizations', organizationsRoutes);
 router.use('/admin-permissions', adminPermissionsRoutes);
+router.use('/quiz-scores', quizScoreRoutes);
 
 
 module.exports = router;
