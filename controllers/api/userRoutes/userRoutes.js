@@ -2,23 +2,23 @@ const router = require("express").Router();
 const { Users, Roles } = require("../../../models");
 const auth = require("../../../middleware/auth");
 const isAdmin = require("../../../middleware/isAdmin");
-const { Op, fn, col, where } = require("sequelize");
+const { Op } = require("sequelize");
 
 const validRoles = [1, 2, 3];
+const ADMIN_ROLE_ID = 2;
+const SUPER_ADMIN_ROLE_ID = 3;
 
 router.get("/", auth, isAdmin, async (req, res) => {
   const { countryId, cityId, organizationId, roleId } = req.query;
-
-  const userIsAdmin = req.user.roleId === 2;
-  const userIsSuperAdmin = req.user.roleId === 3;
+  const userRoleId = req.user.roleId;
 
   try {
     // Initialize the base `where` clause
     let where = {};
 
     // Restrict data visibility based on user role
-    if (userIsAdmin) {
-      // Role 2: Can only view users within the same organization
+    if (userRoleId === ADMIN_ROLE_ID) {
+      // Admin: Can only view users within the same organization
       where.organization_id = req.user.organization_id;
 
       // Optionally filter within the allowed scope
@@ -28,8 +28,8 @@ router.get("/", auth, isAdmin, async (req, res) => {
         ...(cityId && { city_id: cityId }),
         ...(roleId && { role_id: roleId }),
       };
-    } else if (userIsSuperAdmin) {
-      // Role 3: Can view any user
+    } else if (userRoleId === SUPER_ADMIN_ROLE_ID) {
+      // Super-Admin Can view any user
       where = {
         ...(countryId && { country_id: countryId }),
         ...(cityId && { city_id: cityId }),
@@ -46,7 +46,7 @@ router.get("/", auth, isAdmin, async (req, res) => {
     // Fetch the users with filters
     const users = await Users.findAll({
       where,
-      attributes: ["id", "first_name", "last_name", "email"],
+      attributes: ["id", "first_name", "last_name", "email", "organization_id"],
       include: [
         {
           model: Roles,
@@ -66,20 +66,18 @@ router.get("/", auth, isAdmin, async (req, res) => {
 router.get("/search", auth, isAdmin, async (req, res) => {
   //users can be searched by one or more of the following fields. searches are case-insensitive
   const { email, first_name, last_name } = req.query;
-
-  const userIsAdmin = req.user.roleId === 2;
-  const userIsSuperAdmin = req.user.roleId === 3;
+  const userRoleId = req.user.roleId;
 
   try {
     // Initialize the base `where` clause
     let whereClause = {};
     // Restrict data visibility based on user role
 
-    if (userIsAdmin) {
-      // Role 2: Can only view users within the same organization
+    if (userRoleId === ADMIN_ROLE_ID) {
+      // Admin: Can only view users within the same organization
       whereClause.organization_id = req.user.organization_id;
       //if user is neither admin nor super admin, deny access
-    } else if (!userIsSuperAdmin) {
+    } else if (userRoleId !== SUPER_ADMIN_ROLE_ID) {
       return res
         .status(403)
         .json({ message: "You do not have permission to search for users" });
@@ -101,7 +99,7 @@ router.get("/search", auth, isAdmin, async (req, res) => {
     // Fetch the users with filters
     const users = await Users.findAll({
       where: whereClause, // Use the correct `where` object
-      attributes: ["id", "first_name", "last_name", "email"],
+      attributes: ["id", "first_name", "last_name", "email", "organization_id"],
       include: [
         {
           model: Roles,
@@ -119,14 +117,13 @@ router.get("/search", auth, isAdmin, async (req, res) => {
 });
 
 router.get("/:id", auth, isAdmin, async (req, res) => {
-  const userId = req.params.id;
-  const userIsAdmin = req.user.roleId === 2;
-  const userIsSuperAdmin = req.user.roleId === 3;
+  const targetUserId = req.params.id;
+  const userRoleId = req.user.roleId;
 
   try {
     // Find the user by ID
     const user = await Users.findOne({
-      where: { id: userId },
+      where: { id: targetUserId },
       attributes: [
         "id",
         "first_name",
@@ -145,8 +142,8 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Role-based access control (role 1 basically cant query any user)
-    if (userIsAdmin) {
+    // Role-based access control (non-admins basically cant query any user)
+    if (userRoleId === ADMIN_ROLE_ID) {
       // admins can only view users within the same organization
       if (user.organization_id !== req.user.organization_id) {
         return res
@@ -156,7 +153,7 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
               "Access denied, you can only access users from within your organization",
           });
       }
-    } else if (!userIsSuperAdmin) {
+    } else if (userRoleId !== SUPER_ADMIN_ROLE_ID) {
       // super admins can view any user; other roles cannot
       return res
         .status(403)
@@ -231,21 +228,12 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
   const updatedData = req.body; // Data to update
 
   //normal users have been blocked by the isAdmin middleware
-  const userIsAdmin = userRoleId === 2;
-  const userIsSuperAdmin = userRoleId === 3;
 
   try {
-    //if the user is attempting to update themselves
-    if (targetUserId === req.user.id) {
-      return res.status(403).json({
-        message: "wrong api endpoint for updating your own user information",
-      })
-    }
     //if the user is attempting to update the role_id
-
     if (updatedData.role_id !== undefined) {
       //if the user is not a super admin, they cannot update the role_id
-      if (!userIsSuperAdmin) {
+      if (userRoleId !== SUPER_ADMIN_ROLE_ID) {
         return res
           .status(403)
           .json({ message: "You do not have permission to update a user's role_id" });
@@ -266,20 +254,20 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
     if (!targetUser) {
       return res.status(404).json({ message: "Target user not found" });
     }
-    const targetUserIsAdmin = targetUser.role_id === 2;
-    const targetUserIsSuperAdmin = targetUser.role_id === 3;
+    const targetUserIsAdmin = targetUser.role_id === ADMIN_ROLE_ID;
+    const targetUserIsSuperAdmin = targetUser.role_id === SUPER_ADMIN_ROLE_ID;
 
     // aditional role based access control. these are after the fetch of the target user because we need to know certain details about the target user to determine access. could/should we have done this before the fetch by getting the info some other way? 
 
     // if a user is admin, they cannot update a user outside of their organization
-    if (userIsAdmin && targetUser.organization_id !== req.user.organization_id) {
+    if (userRoleId === ADMIN_ROLE_ID && targetUser.organization_id !== req.user.organization_id) {
       return res.status(403).json({
         message:
           "You do not have permission to update a user outside of your organization",
       });
     }
     // if a user is admin, they cannot update any other admin or any super admin
-    if (userIsAdmin && (targetUserIsAdmin || targetUserIsSuperAdmin)) {
+    if (userRoleId === ADMIN_ROLE_ID && (targetUserIsAdmin || targetUserIsSuperAdmin)) {
       return res.status(403).json({
         message: "You do not have permission to update another admin",
       });
@@ -291,7 +279,7 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
       "last_name",
       "email",
       "password",
-      userIsSuperAdmin ? "role_id" : null,
+      userRoleId === SUPER_ADMIN_ROLE_ID ? "role_id" : null,
       "country_id",
       "city_id",
       "organization_id",
@@ -326,9 +314,10 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
 
 
 router.delete("/:id", auth, isAdmin, async (req, res) => {
+  const userId = req.user.id; // Authenticated user's ID
   const userRoleId = req.user.roleId; // Authenticated user's role ID
-  const userOrganizationId = req.user.organizationId; // Authenticated user's organization ID
-  const userIsAdmin = userRoleId === 2;
+  const userOrganizationId = req.user.organization_id; // Authenticated user's organization ID
+
   const { id: targetUserId } = req.params; // Target user ID to delete
   
   if(targetUserId === userId){
@@ -347,7 +336,7 @@ router.delete("/:id", auth, isAdmin, async (req, res) => {
     }
 
     // Role-based deletion rules
-    if(userIsAdmin){
+    if(userRoleId === ADMIN_ROLE_ID){
       // Admins can only delete users within the same organization
       if(targetUser.organization_id !== userOrganizationId){
         return res.status(403).json({
@@ -356,7 +345,7 @@ router.delete("/:id", auth, isAdmin, async (req, res) => {
       }
     }
     // admin cannot delete another admin or a super admin
-    if(userIsAdmin && (targetUserIsAdmin || targetUserIsSuperAdmin)){
+    if(userRoleId === ADMIN_ROLE_ID && (targetUserIsAdmin || targetUserIsSuperAdmin)){
       return res.status(403).json({
         message: "You do not have permission to delete another admin",
       });
