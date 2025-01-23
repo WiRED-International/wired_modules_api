@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-require('dotenv').config();
 
 const secret = process.env.SECRET;
 
@@ -18,11 +17,9 @@ const auth = (req, res, next) => {
       return res.status(401).json({ message: 'No token provided' });
     }
 
-    console.log('Received Token:', token);
   
     try {
       const decoded = jwt.verify(token, secret);
-      console.log('Decoded Token:', decoded); 
   
       req.user = decoded;
   

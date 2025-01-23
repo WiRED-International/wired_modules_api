@@ -3,7 +3,6 @@ const app = express();
 const sequelize = require('./config/connection');
 const port = process.env.PORT || 3000;
 const auth = require('./middleware/auth');
-require('dotenv').config();
 
 const routes = require('./controllers/api/index');
 

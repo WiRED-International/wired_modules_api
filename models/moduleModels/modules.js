@@ -59,9 +59,4 @@ Modules.init(
         underscored: true,
     }
 );
-
-Modules.belongsTo(Modules, { as: 'redirectedModule', foreignKey: 'redirect_module_id' });
-
-// Modules.belongsToMany(SubCategories, { as: 'subCategories', through: 'module_subcategory', foreignKey: 'module_id' });
-
 module.exports = Modules;

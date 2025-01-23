@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
-require('dotenv').config();
-const { AdminPermissions, Users } = require('../models');
+
+const {  Users } = require('../models');
 
 const secret = process.env.SECRET;
 
