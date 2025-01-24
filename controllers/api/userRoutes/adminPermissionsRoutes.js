@@ -1,12 +1,9 @@
 const router = require('express').Router();
-const { AdminPermissions } = require('../../../models');
-const isAdmin = require('../../../middleware/isAdmin');
+const { AdminPermissions, Users, Roles } = require('../../../models');
 const isSuperAdmin = require('../../../middleware/isSuperAdmin');
 
 router.get('/', isSuperAdmin, async (req, res) => {
     const { adminId, countryId, cityId, organizationId, roleId } = req.query;
-
-    console.log('Query Parameters:', req.query);
 
     try {
         const where = {
@@ -19,7 +16,19 @@ router.get('/', isSuperAdmin, async (req, res) => {
 
         const permissions = await AdminPermissions.findAll({
             where,
-            attributes: ['id', 'country_id', 'city_id', 'organization_id', 'role_id'],
+            attributes: ['id', 'country_id', 'city_id', 'organization_id', 'role_id', 'admin_id'],
+            include: [
+                {
+                    model: Users, 
+                    as: 'admin', //this matches the alias in the associations
+                    attributes: ['first_name', 'last_name'], 
+                },
+                {
+                    model: Roles, 
+                    as: 'role', //this matches the alias in the associations
+                    attributes: ['name'], 
+                },
+            ],
         });
 
         res.status(200).json(permissions);

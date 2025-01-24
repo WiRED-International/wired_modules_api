@@ -2,8 +2,6 @@ const router = require('express').Router();
 const { Users, Countries } = require('../../../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { create } = require('../../../models/alerts');
-require('dotenv').config();
 
 const secret = process.env.SECRET;
 
@@ -23,9 +21,6 @@ router.post('/register', async (req, res) => {
       }
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
     const newUser = await Users.create({
         first_name,
         last_name,
@@ -34,30 +29,45 @@ router.post('/register', async (req, res) => {
         country_id,
         city_id,
         organization_id,
-        password: hashedPassword,
+        //password is hashed before being stored in the database, using a hook in the User model
+        password
     });
-    res.status(201).json({ user: newUser });
+    const token = jwt.sign(
+      { 
+        id: newUser.id, 
+        email: newUser.email, 
+        roleId: newUser.role_id,
+        //adding organization_id to the token so it can be used in certain queries
+        organization_id: newUser.organization_id,
+      }, 
+      secret, 
+      { expiresIn: '1h' }
+    );
+    res.status(201).json({ user: newUser, token });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
 router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
+  const { email, password, context } = req.body; // Add "context" to the request body to detect if the request is coming from the general app or the admin dashboard
   try {
     const user = await Users.findOne({ where: { email } });
     if (!user) {
-      return res.status(400).json({ message: 'User not found' });
+      return res.status(400).json({ message: 'Invalid username or password' });
     }
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
       return res.status(400).json({ message: 'Invalid username or password' });
     }
+
     const token = jwt.sign(
       { 
         id: user.id, 
         email: user.email, 
-        roleId: user.role_id
+        roleId: user.role_id,
+        //adding organization_id to the token so it can be used in certain queries
+        organization_id: user.organization_id,
       }, 
       secret, 
       { expiresIn: '1h' }
@@ -82,6 +92,7 @@ router.post('/login', async (req, res) => {
 router.post('/logout', (req, res) => {
   // Optional: Invalidate token on the client-side by removing it from storage
   // Server-side, tokens are typically stateless and don't need invalidation.
+  // Logout function on the front end will likely just remove the token from client storage
   res.status(200).json({ message: 'Logout successful' });
 });
 
