@@ -33,7 +33,7 @@ router.get('/me', auth, async (req, res) => {
   try {
     // Fetch the authenticated user's details
     const user = await Users.findByPk(req.user.id, {
-      attributes: ['id', 'first_name', 'last_name', 'email'], 
+      attributes: ['id', 'first_name', 'last_name', 'email', 'createdAt'], 
       include: [
         { 
           model: QuizScores, 
