@@ -1,5 +1,5 @@
 const { Model, DataTypes } = require('sequelize');
-const sequelize = require('../config/connection');
+const sequelize = require('../../config/connection');
 
 class Downloads extends Model {}
 
@@ -27,6 +27,14 @@ Downloads.init(
         key: 'id',
       },
     },
+    user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true, // This field is not required, as the user may not be logged in
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+    },
     latitude: {
       type: DataTypes.DECIMAL(10, 8),
       allowNull: false,
@@ -35,13 +43,18 @@ Downloads.init(
         type: DataTypes.DECIMAL(11, 8),
         allowNull: false,
     },
+    download_date: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    }
 
   },
   {
     sequelize,
     modelName: 'Downloads',
     tableName: 'downloads',
-    timestamps: true,
+    timestamps: false,
     freezeTableName: true,
     underscored: true, 
     validate: {

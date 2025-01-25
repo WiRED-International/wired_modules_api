@@ -10,7 +10,7 @@ const Roles = require('./userModels/roles');
 const Users = require('./userModels/users');
 const AdminPermissions = require('./userModels/adminPermissions');
 const QuizScores = require('./moduleModels/quizScores');
-const Downloads = require('./downloads');
+const Downloads = require('./moduleModels/downloads');
 const Packages = require('./moduleModels/packages')
 
 // User-related associations
@@ -70,6 +70,9 @@ Downloads.belongsTo(Modules, { as: 'module', foreignKey: 'module_id' });
 
 Packages.hasMany(Downloads, { as: 'downloads', foreignKey: 'package_id' });
 Downloads.belongsTo(Packages, { as: 'package', foreignKey: 'package_id' });
+
+Users.hasMany(Downloads, { as: 'downloads', foreignKey: 'user_id' });
+Downloads.belongsTo(Users, { as: 'user', foreignKey: 'user_id' });
 
 
 module.exports = {
