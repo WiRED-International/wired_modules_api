@@ -10,6 +10,8 @@ const Roles = require('./userModels/roles');
 const Users = require('./userModels/users');
 const AdminPermissions = require('./userModels/adminPermissions');
 const QuizScores = require('./moduleModels/quizScores');
+const Downloads = require('./downloads');
+const Packages = require('./moduleModels/packages')
 
 // User-related associations
 Users.hasMany(QuizScores, { as: 'quizScores', foreignKey: 'user_id' });
@@ -62,6 +64,13 @@ Organizations.belongsTo(Countries, { as: 'country', foreignKey: 'country_id' });
 Cities.hasMany(Organizations, { as: 'organizations', foreignKey: 'city_id' });
 Organizations.belongsTo(Cities, { as: 'cities', foreignKey: 'city_id' });
 
+// Downloads associations
+Modules.hasMany(Downloads, { as: 'downloads', foreignKey: 'module_id' });
+Downloads.belongsTo(Modules, { as: 'module', foreignKey: 'module_id' });
+
+Packages.hasMany(Downloads, { as: 'downloads', foreignKey: 'package_id' });
+Downloads.belongsTo(Packages, { as: 'package', foreignKey: 'package_id' });
+
 
 module.exports = {
   QuizScores,
@@ -76,6 +85,6 @@ module.exports = {
   Roles,
   Users,
   AdminPermissions,
-  
-  
+  Downloads,
+  Packages
 };

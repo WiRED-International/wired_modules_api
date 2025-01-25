@@ -1,5 +1,5 @@
 const Users = require('../models/userModels/users');
-const bcrypt = require('bcryptjs');
+//password hashing occurs in the beforeCreate hook in the user model
 
 const users = [
   {

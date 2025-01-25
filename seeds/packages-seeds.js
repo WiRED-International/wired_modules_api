@@ -1,4 +1,4 @@
-const  Packages  = require('../models/moduleModels/modules');
+const  Packages  = require('../models/moduleModels/packages');
 
 const packagesData = [
     {
