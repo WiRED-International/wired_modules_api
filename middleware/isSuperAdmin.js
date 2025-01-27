@@ -18,7 +18,6 @@ const isSuperAdmin = async(req, res, next) => {
   try {
     
     const decoded = jwt.verify(token, secret);
-    console.log('Decoded Token:', decoded); 
 
     if (decoded.roleId !== 3) {
       return res.status(403).json({ message: 'Super admin access required' });
