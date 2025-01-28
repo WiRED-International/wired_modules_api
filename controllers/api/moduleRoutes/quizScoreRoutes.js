@@ -72,13 +72,34 @@ router.post('/', auth, async (req, res) => {
   }
 
   try {
-    // Check if a quiz score already exists for the given module_id and user_id
+
+    // Ensure user_id and score are numbers
+    const parsedUserId = parseInt(user_id, 10);
+    const parsedScore = parseFloat(score);
+
+    if (isNaN(parsedUserId) || isNaN(parsedScore)) {
+      return res.status(400).json({ message: 'Invalid user_id or score' });
+    }
+
+    // Find the module by the `module_id` field (not the primary key)
+    const module = await Modules.findOne({ where: { module_id } });
+
+    if (!module) {
+      return res.status(404).json({ message: 'Module not found' });
+    }
+
+    // Use the `id` (primary key) of the matched module for associations
+    const resolvedModuleId = module.id;
+    console.log('Resolved Module ID:', resolvedModuleId);
+
+    // Check if a quiz score already exists for the given module `id` and user_id
     const existingQuizScore = await QuizScores.findOne({
-      where: { module_id, user_id },
+      where: { module_id: resolvedModuleId, user_id },
     });
 
     if (existingQuizScore) {
       // Update the existing record
+      console.log('Updating existing quiz score:', existingQuizScore);
       existingQuizScore.score = score;
       existingQuizScore.date_taken = date_taken || new Date(); // Update date_taken if provided
       await existingQuizScore.save();
@@ -91,7 +112,7 @@ router.post('/', auth, async (req, res) => {
 
     // If no existing record, create a new one
     const quizScore = await QuizScores.create({
-      module_id,
+      module_id: resolvedModuleId,
       user_id,
       score,
       date_taken: date_taken || new Date(),
@@ -102,26 +123,11 @@ router.post('/', auth, async (req, res) => {
       quizScore,
     });
   } catch (err) {
-    console.error('Error:', err.message); // Debug log
-    res.status(500).json({ message: err.message });
-  }
-});
-
-router.put('/:id', auth, isAdmin, async (req, res) => {
-  const { id } = req.params;
-  const { score } = req.body;
-
-  try {
-    const quizScore = await QuizScores.findByPk(id);
-    if (!quizScore) {
-      return res.status(404).json({ message: 'Quiz Score not found' });
-    }
-
-    quizScore.score = score;
-    await quizScore.save();
-    res.status(200).json({ message: 'Quiz Score updated successfully', quizScore });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Error:', err);
+    res.status(500).json({
+      message: 'Validation error',
+      errors: err.errors || [],
+    });
   }
 });
 

@@ -40,7 +40,7 @@ const modulesData = [
     {
         //id: 4,
         name: 'Acquired Immunodeficiency Syndrome',
-        module_id: '1004',
+        module_id: '',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -304,7 +304,7 @@ const modulesData = [
     {
         //id: 26,
         name: 'Anemia',
-        module_id: '',
+        module_id: '1026',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -785,7 +785,7 @@ const modulesData = [
     {
         //id: 66,
         name: 'Family planning',
-        module_id: '',
+        module_id: '1059',
         description: '',
         letters: 'F',
         version: '1.0.0',
@@ -1491,6 +1491,18 @@ const modulesData = [
         downloadLink: '',
         packageSize: null,
         redirect_module_id: 45,
+    },
+    {
+        //id: 125,
+        name: 'Anemia for Community Health Workers',
+        module_id: '1177',
+        description: '',
+        letters: 'A',
+        version: '1.0.0',
+        is_downloadable: true,
+        downloadLink: '',
+        packageSize: null,
+        redirect_module_id: null,
     },
 
 ];

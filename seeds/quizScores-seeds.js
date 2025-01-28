@@ -1,35 +1,30 @@
-const QuizScores = require('../models/userModels/quizScores');
+const QuizScores = require('../models/moduleModels/quizScores');
 
 const quizScores = [
   {
-    user_id: 1,
-    quiz_id: 1,
-    score: 10,
+    user_id: 2,
+    module_id: 1,
+    score: 61.51,
+  },   
+  {
+    user_id: 2,
+    module_id: 3,
+    score: 90.11,
   },
   {
-    user_id: 1,
-    quiz_id: 2,
-    score: 8,
+    user_id: 2,
+    module_id: 5,
+    score: 85.35,
   },
   {
-    user_id: 1,
-    quiz_id: 3,
-    score: 9,
+    user_id: 2,
+    module_id: 7,
+    score: 79.99,
   },
   {
-    user_id: 1,
-    quiz_id: 4,
-    score: 7,
-  },
-  {
-    user_id: 1,
-    quiz_id: 5,
-    score: 6,
-  },
-  {
-    user_id: 1,
-    quiz_id: 6,
-    score: 5,
+    user_id: 2,
+    module_id: 12,
+    score: 95.00,
   },
 ];
 
