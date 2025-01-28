@@ -24,7 +24,6 @@ QuizScores.init(
     module_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        unique: true,
         references: {
             model: 'Modules',
             key: 'id',
@@ -49,7 +48,15 @@ QuizScores.init(
     timestamps: true,
     freezeTableName: true,
     underscored: true, 
-  }
+    
+  // Add a unique constraint on the combination of user_id and module_id
+  indexes: [
+    {
+      unique: true,
+      fields: ['user_id', 'module_id'],
+    },
+  ],
+}
 );
 
 module.exports = QuizScores;

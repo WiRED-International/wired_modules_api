@@ -4,7 +4,7 @@ const modulesData = [
     {
         //id: 1,
         name: 'Women\'s Health: Skin and hair health',
-        module_id: '',
+        module_id: '1001',
         description: 'WiRED\'s medical team is currently rewriting the material for this series. Please return to this page for future updates',
         letters: 'W',
         version: '1.0.0',
@@ -28,7 +28,7 @@ const modulesData = [
     },    {
         //id: 3,
         name: 'HIV/AIDS: Caring for someone with AIDS at home',
-        module_id: '',
+        module_id: '1003',
         description: '',
         letters: 'H',
         version: '1.0.0',
@@ -52,7 +52,7 @@ const modulesData = [
     {
         //id: 5,
         name: 'Bronchitis',
-        module_id: '',
+        module_id: '1005',
         description: 'A Guide for General Audiences: This module is specifically targeted to general audiences and contains information about the causes, symptoms, diagnosis and treatment of bronchitis.',
         letters: 'B',
         version: '1.0.0',
@@ -76,7 +76,7 @@ const modulesData = [
     {
         //id: 7,
         name: 'Upper respiratory tract infection; Ear, nose and throat (ENT)',
-        module_id: '',
+        module_id: '1007',
         description: '',
         letters: 'U',
         version: '1.0.0',
@@ -136,7 +136,7 @@ const modulesData = [
     {
         //id: 12,
         name: 'HIV/AIDS: Basic information',
-        module_id: '',
+        module_id: '1012',
         description: '',
         letters: 'H',
         version: '1.0.0',
@@ -304,7 +304,7 @@ const modulesData = [
     {
         //id: 26,
         name: 'Anemia',
-        module_id: '',
+        module_id: '1026',
         description: '',
         letters: 'A',
         version: '1.0.0',
@@ -785,7 +785,7 @@ const modulesData = [
     {
         //id: 66,
         name: 'Family planning',
-        module_id: '',
+        module_id: '1059',
         description: '',
         letters: 'F',
         version: '1.0.0',
@@ -1491,6 +1491,18 @@ const modulesData = [
         downloadLink: '',
         packageSize: null,
         redirect_module_id: 45,
+    },
+    {
+        //id: 125,
+        name: 'Anemia for Community Health Workers',
+        module_id: '1177',
+        description: '',
+        letters: 'A',
+        version: '1.0.0',
+        is_downloadable: true,
+        downloadLink: '',
+        packageSize: null,
+        redirect_module_id: null,
     },
 
 ];

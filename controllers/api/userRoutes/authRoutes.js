@@ -70,7 +70,7 @@ router.post('/login', async (req, res) => {
         organization_id: user.organization_id,
       }, 
       secret, 
-      { expiresIn: '1h' }
+      { expiresIn: '1hr' }
     );
     res.status(200).json({ 
       message: 'Login successful',
