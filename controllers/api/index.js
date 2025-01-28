@@ -15,6 +15,7 @@ const citiesRoutes = require('./userRoutes/citiesRoutes');
 const organizationsRoutes = require('./userRoutes/organizationsRoutes');
 const adminPermissionsRoutes = require('./userRoutes/adminPermissionsRoutes');
 const quizScoreRoutes = require('./moduleRoutes/quizScoreRoutes');
+const downloadsroutes = require('./moduleRoutes/downloadsRoutes')
 
 
 router.use('/modules', modulesRoutes);
@@ -35,6 +36,8 @@ router.use('/cities', citiesRoutes);
 router.use('/organizations', organizationsRoutes);
 router.use('/admin-permissions', adminPermissionsRoutes);
 router.use('/quiz-scores', quizScoreRoutes);
+router.use('/downloads', downloadsroutes);
+
 
 
 module.exports = router;

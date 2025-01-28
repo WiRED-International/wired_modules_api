@@ -1,0 +1,4 @@
+-- ONLY RUN THIS SCRIPT IF YOU WANT TO COMPLETELY RESET THE DATABASE!!
+DROP DATABASE IF EXISTS `wired_modules_db`;
+CREATE DATABASE `wired_modules_db`;
+USE `wired_modules_db`;

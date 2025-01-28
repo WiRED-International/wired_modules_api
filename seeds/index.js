@@ -11,7 +11,9 @@ const seedOrganizations = require('./organizations-seeds');
 const seedRoles = require('./roles-seeds');
 const seedUsers = require('./users-seeds');
 const seedAdminPermissions = require('./adminPermissions-seeds');
+const seedDownloads = require('./downloads-seeds')
 const seedQuizScores = require('./quizScores-seeds');
+
 
 
 const seed = async () => {
@@ -71,6 +73,10 @@ const seed = async () => {
         console.log('Seeding admin permissions...');
         await seedAdminPermissions(); // Seed admin permissions
         console.log('Admin permissions seeded.');
+
+        console.log('Seeding downloads...');
+        await seedDownloads(); // Seed downloads
+        console.log('Downloads seeded.');
 
         console.log('Seeding quiz scores...');
         await seedQuizScores(); // Seed quiz scores
