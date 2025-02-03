@@ -32,7 +32,7 @@ module.exports = {
       },
       role_id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        allowNull: true,
         references: {
           model: 'roles', // Ensure this table exists in your database
           key: 'id',
