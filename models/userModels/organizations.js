@@ -19,7 +19,7 @@ Organizations.init(
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
-        model: 'Countries',
+        model: 'countries',
         key: 'id',
       },
     },
@@ -27,7 +27,7 @@ Organizations.init(
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
-        model: 'Cities',
+        model: 'cities',
         key: 'id',
       },
     },
