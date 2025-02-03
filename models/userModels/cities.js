@@ -19,7 +19,7 @@ Cities.init(
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
-        model: 'Countries',
+        model: 'countries',
         key: 'id',
       },
     },

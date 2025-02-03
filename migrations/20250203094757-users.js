@@ -34,7 +34,7 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: true,
         references: {
-          model: 'roles', // Ensure this table exists in your database
+          model: 'roles', 
           key: 'id',
         },
         defaultValue: 1,

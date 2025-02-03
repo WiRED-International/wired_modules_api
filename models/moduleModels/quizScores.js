@@ -15,7 +15,7 @@ QuizScores.init(
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-            model: 'Users',
+            model: 'users',
             key: 'id',
         },
         onDelete: 'CASCADE',
@@ -25,7 +25,7 @@ QuizScores.init(
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-            model: 'Modules',
+            model: 'modules',
             key: 'id',
         },
         onDelete: 'CASCADE',

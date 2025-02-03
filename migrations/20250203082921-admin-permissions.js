@@ -14,7 +14,7 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'Users', // Ensure 'Users' table exists
+          model: 'users', 
           key: 'id',
         },
         onDelete: 'CASCADE',
@@ -23,7 +23,7 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: true,
         references: {
-          model: 'countries', // Ensure 'countries' table exists
+          model: 'countries', 
           key: 'id',
         },
       },
@@ -31,7 +31,7 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: true,
         references: {
-          model: 'cities', // Ensure 'cities' table exists
+          model: 'cities', 
           key: 'id',
         },
       },
@@ -39,7 +39,7 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: true,
         references: {
-          model: 'organizations', // Ensure 'organizations' table exists
+          model: 'organizations', 
           key: 'id',
         },
       },
@@ -47,7 +47,7 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: true,
         references: {
-          model: 'roles', // Ensure 'roles' table exists
+          model: 'roles', 
           key: 'id',
         },
         onDelete: 'CASCADE',
