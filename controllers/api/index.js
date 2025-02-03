@@ -36,7 +36,7 @@ router.use('/cities', citiesRoutes);
 router.use('/organizations', organizationsRoutes);
 router.use('/admin-permissions', adminPermissionsRoutes);
 router.use('/quiz-scores', quizScoreRoutes);
-router.use('/downloads', downloadsroutes);
+router.use('/api/downloads', downloadsroutes);
 
 
 
