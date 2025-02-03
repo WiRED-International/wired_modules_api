@@ -36,11 +36,6 @@ Users.init(
       type: DataTypes.STRING,
       allowNull: false,
     },
-    // role: {
-    //   type: DataTypes.ENUM('user', 'admin', 'super_admin'),
-    //   allowNull: false,
-    //   defaultValue: 'user',
-    // },
     role_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
