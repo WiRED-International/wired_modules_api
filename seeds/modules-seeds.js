@@ -1504,6 +1504,18 @@ const modulesData = [
         packageSize: null,
         redirect_module_id: null,
     },
+    {
+        //id: 126,
+        name: '101 CHW Overview of the CHW Program',
+        module_id: '90111268',
+        description: '',
+        letters: 'O',
+        version: '1.0.0',
+        is_downloadable: true,
+        downloadLink: '',
+        packageSize: null,
+        redirect_module_id: null,
+    },
 
 ];
 
