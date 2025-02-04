@@ -7,7 +7,7 @@ const { Op } = require('sequelize');
 router.get('/', isSuperAdmin, async (req, res) => {
     try {
         // Extract query parameters from the request
-        const { module_id, package_id, user_id, latitude, longitude, date_before, date_after, module_name, package_name, sort_by= 'download_date', sort_dir = 'DESC' } = req.query;
+        const { module_id, package_id, user_id, latitude, longitude, date_before, date_after, module_name, package_name, sort_by='package', sort_dir = 'DESC' } = req.query;
 
         // Build the filtering criteria dynamically
         const whereConditions = {};
@@ -16,6 +16,12 @@ router.get('/', isSuperAdmin, async (req, res) => {
         if (user_id) whereConditions.user_id = user_id;
         if (latitude) whereConditions.latitude = latitude;
         if (longitude) whereConditions.longitude = longitude;
+
+        if (sort_by === 'module') {
+            whereConditions.package_id = { [Op.is]: null };
+        } else if (sort_by === 'package') {
+            whereConditions.module_id = { [Op.is]: null };
+        }
 
         //filtering by date
         if (date_before) {
@@ -49,7 +55,17 @@ router.get('/', isSuperAdmin, async (req, res) => {
         //determine sorting order
         const order = [];
         if (sort_by) {
-            order.push([sort_by, sort_dir || 'ASC']);
+            const direction = sort_dir && sort_dir.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+            console.log('direction:', direction)    
+            if (sort_by === 'module') {
+                console.log('here!')
+                // Sort by module name from the associated Modules table
+                order.push([{ model: Modules, as: 'module' }, 'name', direction]);
+            } else if (sort_by === 'package') {
+                // Sort by package name from the associated Packages table
+                order.push([{model: Packages, as: 'package'}, 'name', direction]);
+            }
+            // order.push([sort_by, sort_dir || 'ASC']);
         }
         // Fetch data with filters applied
         const downloadData = await Downloads.findAll({
