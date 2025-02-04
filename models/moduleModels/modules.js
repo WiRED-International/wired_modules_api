@@ -59,4 +59,6 @@ Modules.init(
         underscored: true,
     }
 );
+
+Modules.belongsTo(Modules, { as: 'redirectedModule', foreignKey: 'redirect_module_id' });
 module.exports = Modules;
