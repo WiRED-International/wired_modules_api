@@ -7,7 +7,7 @@ const { Op } = require('sequelize');
 router.get('/', isSuperAdmin, async (req, res) => {
     try {
         // Extract query parameters from the request
-        const { module_id, package_id, user_id, latitude, longitude, date_before, date_after, module_name, package_name, sort_by='package', sort_dir = 'DESC' } = req.query;
+        const { module_id, package_id, user_id, latitude, longitude, start_date, end_date, module_name, package_name, sort_by, sort_dir } = req.query;
 
         // Build the filtering criteria dynamically
         const whereConditions = {};
@@ -24,18 +24,19 @@ router.get('/', isSuperAdmin, async (req, res) => {
         }
 
         //filtering by date
-        if (date_before) {
-            whereConditions.download_date = {
-                ...whereConditions.download_date, // Merge existing conditions if any
-                [Op.lte]: new Date(date_before), // `lte` means less than or equal
-            };
-        }
-        if (date_after) {
+        if (start_date) {
             whereConditions.download_date = {
                 ...whereConditions.download_date,
-                [Op.gte]: new Date(date_after), // `gte` means greater than or equal
+                [Op.gte]: Math.floor(new Date(start_date).getTime() / 1000), // `gte` means greater than or equal
             };
         }
+        if (end_date) {
+            whereConditions.download_date = {
+                ...whereConditions.download_date, // Merge existing conditions if any
+                [Op.lte]: Math.floor(new Date(end_date).getTime() / 1000), // `lte` means less than or equal
+            };
+        }
+
         //dynamically include the module and package models depending on the query parameters
         const moduleInclude = {
             model: Modules,
@@ -64,6 +65,9 @@ router.get('/', isSuperAdmin, async (req, res) => {
             } else if (sort_by === 'package') {
                 // Sort by package name from the associated Packages table
                 order.push([{model: Packages, as: 'package'}, 'name', direction]);
+            } else if(sort_by === 'date') {
+                order.push(['download_date', direction]);
+
             }
             // order.push([sort_by, sort_dir || 'ASC']);
         }
