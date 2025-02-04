@@ -44,11 +44,10 @@ Downloads.init(
         allowNull: false,
     },
     download_date: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER, // Store Unix timestamp as an integer
       allowNull: false,
-      defaultValue: DataTypes.NOW,
-    }
-
+      defaultValue: () => Math.floor(Date.now() / 1000), // Default value is the current Unix timestamp
+    },
   },
   {
     sequelize,
