@@ -7,7 +7,7 @@ const { Op } = require('sequelize');
 router.get('/', isSuperAdmin, async (req, res) => {
     try {
         // Extract query parameters from the request
-        const { module_id, package_id, user_id, latitude, longitude, date_before, date_after } = req.query;
+        const { module_id, package_id, user_id, latitude, longitude, date_before, date_after, module_name, package_name } = req.query;
 
         // Build the filtering criteria dynamically
         const whereConditions = {};
@@ -30,13 +30,27 @@ router.get('/', isSuperAdmin, async (req, res) => {
                 [Op.gte]: new Date(date_after), // `gte` means greater than or equal
             };
         }
+        const moduleInclude = {
+            model: Modules,
+            as: 'module', 
+        };
 
+        if (module_name) {
+            moduleInclude.where = { name: { [Op.like]: `%${module_name}%` } };
+        }
+        const packageInclude = {
+            model: Packages,
+            as: 'package',
+        }
+        if (package_name) {
+            packageInclude.where = { name: { [Op.like]: `%${package_name}%` } };
+        }
         // Fetch data with filters applied
         const downloadData = await Downloads.findAll({
             where: whereConditions,
             include: [
-                { model: Modules, as: 'module' },
-                { model: Packages, as: 'package' },
+                moduleInclude,
+                packageInclude,
                 { model: Users, as: 'user', attributes: { exclude: ['password'] } },
             ],
         });
