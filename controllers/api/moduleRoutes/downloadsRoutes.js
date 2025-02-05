@@ -2,21 +2,21 @@ const router = require('express').Router();
 const isSuperAdmin = require('../../../middleware/isSuperAdmin');
 const { Downloads, Modules, Packages, Users } = require('../../../models')
 const { Op } = require('sequelize');
+const Sequelize = require('sequelize');
 
 // Get all downloads
 router.get('/', isSuperAdmin, async (req, res) => {
     try {
         // Extract query parameters from the request
-        const { module_id, package_id, user_id, latitude, longitude, start_date, end_date, module_name, package_name, sort_by, sort_dir } = req.query;
+        const { module_id, package_id, user_id, latitude, longitude, start_date, end_date, module_name, package_name, sort_by, sort_dir, distance } = req.query;
 
         // Build the filtering criteria dynamically
         const whereConditions = {};
         if (module_id) whereConditions.module_id = module_id;
         if (package_id) whereConditions.package_id = package_id;
         if (user_id) whereConditions.user_id = user_id;
-        if (latitude) whereConditions.latitude = latitude;
-        if (longitude) whereConditions.longitude = longitude;
 
+        // if the user is sorting by module name, then we don't show results where module_id is null and vice versa for package
         if (sort_by === 'module') {
             whereConditions.package_id = { [Op.is]: null };
         } else if (sort_by === 'package') {
@@ -61,16 +61,35 @@ router.get('/', isSuperAdmin, async (req, res) => {
             if (sort_by === 'module') {
                 console.log('here!')
                 // Sort by module name from the associated Modules table
-                order.push([{ model: Modules, as: 'module' }, 'name', direction]);
+                order.push([
+                    Sequelize.literal(`COALESCE(module.name, 'ZZZ') ${direction}`)
+                ]);
             } else if (sort_by === 'package') {
                 // Sort by package name from the associated Packages table
-                order.push([{model: Packages, as: 'package'}, 'name', direction]);
+                order.push(
+                    Sequelize.literal(`COALESCE(package.name, 'ZZZ') ${direction}`)
+                );
             } else if(sort_by === 'date') {
                 order.push(['download_date', direction]);
 
             }
-            // order.push([sort_by, sort_dir || 'ASC']);
         }
+        //if the user has provided latitude, longitude, and distance, then we will filter the results based on the distance from the provided coordinates
+        if (latitude && longitude && distance !== undefined) {
+            console.log('distance:', distance)
+            const lat = parseFloat(latitude);
+            const lon = parseFloat(longitude);
+            const earthRadiusMiles = 3958.8; // Earth's radius in miles
+
+            whereConditions[Op.and] = Sequelize.literal(`
+                (${earthRadiusMiles} * acos(
+                    cos(radians(${lat})) * cos(radians(downloads.latitude)) * 
+                    cos(radians(downloads.longitude) - radians(${lon})) + 
+                    sin(radians(${lat})) * sin(radians(downloads.latitude))
+                )) <= ${distance}
+            `);
+        }
+
         // Fetch data with filters applied
         const downloadData = await Downloads.findAll({
             where: whereConditions,
