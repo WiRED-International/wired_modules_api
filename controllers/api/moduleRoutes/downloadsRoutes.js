@@ -2,43 +2,98 @@ const router = require('express').Router();
 const isSuperAdmin = require('../../../middleware/isSuperAdmin');
 const { Downloads, Modules, Packages, Users } = require('../../../models')
 const { Op } = require('sequelize');
+const Sequelize = require('sequelize');
 
 // Get all downloads
 router.get('/', isSuperAdmin, async (req, res) => {
     try {
         // Extract query parameters from the request
-        const { module_id, package_id, user_id, latitude, longitude, date_before, date_after } = req.query;
+        const { module_id, package_id, user_id, latitude, longitude, start_date, end_date, module_name, package_name, sort_by, sort_dir, distance } = req.query;
 
         // Build the filtering criteria dynamically
         const whereConditions = {};
         if (module_id) whereConditions.module_id = module_id;
         if (package_id) whereConditions.package_id = package_id;
         if (user_id) whereConditions.user_id = user_id;
-        if (latitude) whereConditions.latitude = latitude;
-        if (longitude) whereConditions.longitude = longitude;
+
+        // if the user is sorting by module name, then we don't show results where module_id is null and vice versa for package
+        if (sort_by === 'module') {
+            whereConditions.package_id = { [Op.is]: null };
+        } else if (sort_by === 'package') {
+            whereConditions.module_id = { [Op.is]: null };
+        }
 
         //filtering by date
-        if (date_before) {
-            whereConditions.download_date = {
-                ...whereConditions.download_date, // Merge existing conditions if any
-                [Op.lte]: new Date(date_before), // `lte` means less than or equal
-            };
-        }
-        if (date_after) {
+        if (start_date) {
             whereConditions.download_date = {
                 ...whereConditions.download_date,
-                [Op.gte]: new Date(date_after), // `gte` means greater than or equal
+                [Op.gte]: start_date, // `gte` means greater than or equal
             };
+        }
+        if (end_date) {
+            whereConditions.download_date = {
+                ...whereConditions.download_date, // Merge existing conditions if any
+                [Op.lte]: end_date, // `lte` means less than or equal
+            };
+        }
+
+        //dynamically include the module and package models depending on the query parameters
+        const moduleInclude = {
+            model: Modules,
+            as: 'module', 
+        };
+
+        if (module_name) {
+            moduleInclude.where = { name: { [Op.like]: `%${module_name}%` } };
+        }
+        const packageInclude = {
+            model: Packages,
+            as: 'package',
+        }
+        if (package_name) {
+            packageInclude.where = { name: { [Op.like]: `%${package_name}%` } };
+        }
+        //determine sorting order
+        const order = [];
+        if (sort_by) {
+            const direction = sort_dir && sort_dir.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+        
+            if (sort_by === 'module') {
+                order.push([
+                    Sequelize.literal(`COALESCE(module.name, 'ZZZ') ${direction}`)
+                ]);
+            } else if (sort_by === 'package') {
+                order.push([
+                    Sequelize.literal(`COALESCE(package.name, 'ZZZ') ${direction}`)
+                ]);
+            } else if(sort_by === 'date') {
+                order.push(['download_date', direction]);
+            }
+        }
+        //if the user has provided latitude, longitude, and distance, then we will filter the results based on the distance from the provided coordinates
+        if (latitude && longitude && distance !== undefined) {
+            const lat = parseFloat(latitude);
+            const lon = parseFloat(longitude);
+            const earthRadiusMiles = 3958.8; // Earth's radius in miles
+
+            whereConditions[Op.and] = Sequelize.literal(`
+                (${earthRadiusMiles} * acos(
+                    cos(radians(${lat})) * cos(radians(downloads.latitude)) * 
+                    cos(radians(downloads.longitude) - radians(${lon})) + 
+                    sin(radians(${lat})) * sin(radians(downloads.latitude))
+                )) <= ${distance}
+            `);
         }
 
         // Fetch data with filters applied
         const downloadData = await Downloads.findAll({
             where: whereConditions,
             include: [
-                { model: Modules, as: 'module' },
-                { model: Packages, as: 'package' },
+                moduleInclude,
+                packageInclude,
                 { model: Users, as: 'user', attributes: { exclude: ['password'] } },
             ],
+            order,
         });
 
         res.status(200).json(downloadData);

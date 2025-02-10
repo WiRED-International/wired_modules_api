@@ -3,7 +3,7 @@ const  Packages  = require('../models/moduleModels/packages');
 const packagesData = [
     {
         //id: 1,
-        name: 'Package 1',
+        name: 'A Package',
         description: 'Package 1 description',
         letters: 'P',
         version: '1.0.0',
@@ -12,7 +12,7 @@ const packagesData = [
     },
     {
         //id: 2,
-        name: 'Package 2',
+        name: 'Best Package',
         description: 'Package 2 description',
         letters: 'P',
         version: '1.0.0',
@@ -21,7 +21,7 @@ const packagesData = [
     },
     {
         //id: 3,
-        name: 'Package 3',
+        name: 'Cool Package',
         description: 'Package 3 description',
         letters: 'P',
         version: '1.0.0',
