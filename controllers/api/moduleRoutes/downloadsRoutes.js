@@ -27,13 +27,13 @@ router.get('/', isSuperAdmin, async (req, res) => {
         if (start_date) {
             whereConditions.download_date = {
                 ...whereConditions.download_date,
-                [Op.gte]: Math.floor(new Date(start_date).getTime() / 1000), // `gte` means greater than or equal
+                [Op.gte]: start_date, // `gte` means greater than or equal
             };
         }
         if (end_date) {
             whereConditions.download_date = {
                 ...whereConditions.download_date, // Merge existing conditions if any
-                [Op.lte]: Math.floor(new Date(end_date).getTime() / 1000), // `lte` means less than or equal
+                [Op.lte]: end_date, // `lte` means less than or equal
             };
         }
 
@@ -57,26 +57,21 @@ router.get('/', isSuperAdmin, async (req, res) => {
         const order = [];
         if (sort_by) {
             const direction = sort_dir && sort_dir.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
-            console.log('direction:', direction)    
+        
             if (sort_by === 'module') {
-                console.log('here!')
-                // Sort by module name from the associated Modules table
                 order.push([
                     Sequelize.literal(`COALESCE(module.name, 'ZZZ') ${direction}`)
                 ]);
             } else if (sort_by === 'package') {
-                // Sort by package name from the associated Packages table
-                order.push(
+                order.push([
                     Sequelize.literal(`COALESCE(package.name, 'ZZZ') ${direction}`)
-                );
+                ]);
             } else if(sort_by === 'date') {
                 order.push(['download_date', direction]);
-
             }
         }
         //if the user has provided latitude, longitude, and distance, then we will filter the results based on the distance from the provided coordinates
         if (latitude && longitude && distance !== undefined) {
-            console.log('distance:', distance)
             const lat = parseFloat(latitude);
             const lon = parseFloat(longitude);
             const earthRadiusMiles = 3958.8; // Earth's radius in miles
