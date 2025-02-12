@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { Users, Countries } = require('../../../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const nodemailer = require("nodemailer");
 
 const secret = process.env.SECRET;
 
@@ -96,5 +97,55 @@ router.post('/logout', (req, res) => {
   // Logout function on the front end will likely just remove the token from client storage
   res.status(200).json({ message: 'Logout successful' });
 });
+
+//routes for password reset functionality
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: false, // I was told to use `true` for port 465, `false` for other ports
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await Users.findOne({ where: { email } });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid email' });
+    }
+    const token = jwt.sign({ id: user.id }, secret, { expiresIn: '1h' });
+    const url = `${process.env.CLIENT_URL}/reset-password/${token}`;
+    const mailOptions = {
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: 'Password Reset',
+      text: `Click this link to reset your password: ${url}`,
+    };
+    await transporter.sendMail(mailOptions);
+    res.status(200).json({ message: 'Password reset email sent' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+})
+
+router.post('/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+  try {
+    const { id } = jwt.verify(token, secret);
+    const user = await Users.findByPk(id);
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid token' });
+    }
+    user.password = password;
+    await user.save();
+    res.status(200).json({ message: 'Password reset successful' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+})
 
 module.exports = router;
