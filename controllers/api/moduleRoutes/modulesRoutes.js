@@ -33,6 +33,18 @@ router.get('/', async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+//get modules name only
+router.get('/names', async (req, res) => {
+  try {
+    const modules = await Modules.findAll({
+      attributes: ['id', 'name'],
+      order: [['name', 'ASC']], 
+    });
+    res.status(200).json(modules);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 router.get('/:id', async (req, res) => {
   try {

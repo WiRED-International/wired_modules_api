@@ -9,6 +9,18 @@ router.get('/', async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+//get packages name only
+router.get('/names', async (req, res) => {
+  try {
+    const packages = await Packages.findAll({
+      attributes: ['id', 'name'],
+      order: [['name', 'ASC']], 
+    });
+    res.status(200).json(packages);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 router.get('/:id', async (req, res) => {
   try {

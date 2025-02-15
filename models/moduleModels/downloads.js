@@ -35,6 +35,8 @@ Downloads.init(
         key: 'id',
       },
     },
+    //apparently sequelize stores decimals as strings to prevent rounding errors, so they still need to be parsed as floats
+
     latitude: {
       type: DataTypes.DECIMAL(10, 8),
       allowNull: false,

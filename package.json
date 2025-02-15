@@ -6,7 +6,8 @@
   "scripts": {
     "start": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "seed": "node ./seeds/index.js && node ./seeds/pivot-seed.js"
+    "seed": "node ./seeds/index.js && node ./seeds/pivot-seed.js",
+    "seed-downloads": "node ./seeds/downloads-seeds.js"
   },
   "author": "",
   "license": "ISC",
