@@ -12,6 +12,7 @@ const AdminPermissions = require('./userModels/adminPermissions');
 const QuizScores = require('./moduleModels/quizScores');
 const Downloads = require('./moduleModels/downloads');
 const Packages = require('./moduleModels/packages')
+const CountryBoundaries = require('./moduleModels/countryBoundaries')
 
 // User-related associations
 Users.hasMany(QuizScores, { as: 'quizScores', foreignKey: 'user_id' });
@@ -89,5 +90,6 @@ module.exports = {
   Users,
   AdminPermissions,
   Downloads,
-  Packages
+  Packages,
+  CountryBoundaries
 };
