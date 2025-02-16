@@ -50,6 +50,18 @@ Downloads.init(
       allowNull: false,
       defaultValue: () => Math.floor(Date.now() / 1000), // Default value is the current Unix timestamp
     },
+    country_code: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    country_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'countries',
+        key: 'id',
+      },
+    },
   },
   {
     sequelize,

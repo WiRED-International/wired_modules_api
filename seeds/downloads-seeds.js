@@ -1,42 +1,60 @@
-const { Downloads } = require('../models');
+const { Downloads, Countries } = require('../models');
 const { landLocations } = require('./downloads-seeds-data');
+const getCountryCode = require('../utils/getCountryCode')
 
-const generateDownloads = () => {
+const generateDownloads = async () => {
   const downloads = [];
 
   for (const location of landLocations) {
-      const hasPackageId = Math.random() < 0.2; // ~20% chance of having package_id instead of module_id
+    const hasPackageId = Math.random() < 0.2; // ~20% chance of having package_id instead of module_id
 
-      const download = {
-          download_date: Math.floor(
-              (Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000) / 1000
-          ), // Random Unix timestamp within the last year
-          latitude: location.lat, // Random latitude
-          longitude: location.lon, // Random longitude
-          ...(hasPackageId
-              ? { package_id: Math.floor(Math.random() * 3) + 1 }
-              : { module_id: Math.floor(Math.random() * 126) + 1 }),
-      };
+    const downloadData = {
+      download_date: Math.floor(
+        (Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000) / 1000
+      ), // Random Unix timestamp within the last year so that when we seed the data, it's fairly recent
+      latitude: location.lat, // Random latitude
+      longitude: location.lon, // Random longitude
+      country_code: location.country_code, // Country code based on latitude and longitude
+      country_id: location.country_id, // Country code based on latitude and longitude
 
-      downloads.push(download);
+      ...(hasPackageId
+        ? { package_id: Math.floor(Math.random() * 3) + 1 }
+        : { module_id: Math.floor(Math.random() * 126) + 1 }),
+    };
+    if (!downloadData.country_id) {
+      if (!downloadData.country_code) {
+        downloadData.country_code = await getCountryCode(downloadData.latitude, downloadData.longitude);
+      }
+      const country = await Countries.findOne({ where: { code: downloadData.country_code } });
+      if (!country) {
+        console.error('Country code could not be determined');
+        continue;
+      }
+      downloadData.country_id = country.id;
+
+    }
+
+
+    downloads.push(downloadData);
   }
 
   return downloads;
 };
 
-const downloadData = generateDownloads();
+
 
 
 
 
 const seedDownloads = async () => {
-    try {
-      //delete all existing rows in the Downloads table
-      await Downloads.destroy({ truncate: true, restartIdentity: true });
-      await Downloads.bulkCreate(downloadData);
-    } catch (err) {
-        console.error('Error seeding downloads:', err);
-    }
+  const downloadData = await generateDownloads();
+  try {
+    //delete all existing rows in the Downloads table
+    await Downloads.destroy({ truncate: true, restartIdentity: true });
+    await Downloads.bulkCreate(downloadData);
+  } catch (err) {
+    console.error('Error seeding downloads:', err);
+  }
 };
 seedDownloads();
 
