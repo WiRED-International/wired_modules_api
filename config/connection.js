@@ -1,5 +1,4 @@
 const Sequelize = require('sequelize');
-const mysql = require("mysql2");
 
 // Enable access to .env variables
 require('dotenv').config();
