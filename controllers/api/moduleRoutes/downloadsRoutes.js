@@ -147,16 +147,16 @@ router.post('/', async (req, res) => {
         if (!country_code) {
             country_code = await getCountryCode(req.body.latitude, req.body.longitude);
             if (!country_code) {
-                return res.status(400).json({ message: 'Country code could not be determined' });
+                country_code = null
             }
         }
         if (!country_id) {
             const country = await Countries.findOne({ where: { code: country_code } })
             if (!country) {
-                return res.status(400).json({ message: 'Invalid country code' });
+                country_id = null;
+            }else{
+                country_id = country.id;
             }
-    
-            country_id = country.id;
         }
 
 
