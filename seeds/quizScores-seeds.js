@@ -19,13 +19,34 @@ const quizScores = [
   {
     user_id: 2,
     module_id: 7,
-    score: 79.99,
+    score: 89.99,
   },
   {
     user_id: 2,
     module_id: 12,
     score: 95.00,
   },
+  {
+    user_id: 1,
+    module_id: 5,
+    score: 85.35,
+  },
+  {
+    user_id: 1,
+    module_id: 7,
+    score: 79.99,
+  },
+  {
+    user_id: 1,
+    module_id: 12,
+    score: 95.00,
+  },
+  {
+    user_id: 1,
+    module_id: 15,
+    score: 95.00,
+  },
+
 ];
 
 const quizScoresSeed = async () => {
