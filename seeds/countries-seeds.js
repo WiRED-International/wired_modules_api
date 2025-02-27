@@ -1,19 +1,7 @@
 const Countries = require('../models/userModels/countries');
 
-const countries = [
-  {
-    name: 'Kenya',
-  },
-  {
-    name: 'Nigeria',
-  },
-  {
-    name: 'Liberia',
-  },
-  {
-    name: 'Armenia',
-  },
-];
+//get data from countryNames.json
+const countries = require('../utils/countryNames.json'); 
 
 const countriesSeed = async () => {
   try {

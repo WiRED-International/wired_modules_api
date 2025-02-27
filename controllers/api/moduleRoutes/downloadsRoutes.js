@@ -1,20 +1,22 @@
 const router = require('express').Router();
 const isSuperAdmin = require('../../../middleware/isSuperAdmin');
-const { Downloads, Modules, Packages, Users } = require('../../../models')
+const { Downloads, Modules, Packages, Users, Countries } = require('../../../models')
 const { Op } = require('sequelize');
 const Sequelize = require('sequelize');
+const getCountryCode = require('../../../utils/getCountryCode');
 
 // Get all downloads
 router.get('/', isSuperAdmin, async (req, res) => {
     try {
         // Extract query parameters from the request
-        const { module_id, package_id, user_id, latitude, longitude, start_date, end_date, module_name, package_name, sort_by, sort_dir, distance } = req.query;
+        const { module_id, package_id, user_id, latitude, longitude, start_date, end_date, module_name, package_name, sort_by, sort_dir, distance, country_code } = req.query;
 
         // Build the filtering criteria dynamically
         const whereConditions = {};
         if (module_id) whereConditions.module_id = module_id;
         if (package_id) whereConditions.package_id = package_id;
         if (user_id) whereConditions.user_id = user_id;
+        if (country_code) whereConditions.country_code = country_code;
 
         // if the user is sorting by module name, then we don't show results where module_id is null and vice versa for package
         if (sort_by === 'module') {
@@ -92,6 +94,7 @@ router.get('/', isSuperAdmin, async (req, res) => {
                 moduleInclude,
                 packageInclude,
                 { model: Users, as: 'user', attributes: { exclude: ['password'] } },
+                { model: Countries, as: 'country' },
             ],
             order,
         });
@@ -133,8 +136,41 @@ router.get('/:id', isSuperAdmin, async (req, res) => {
 //Create a new download
 router.post('/', async (req, res) => {
     try {
-        const newDownload = await Downloads.create(req.body);
-        //validation of the fields occurs in the model, including making sure that at least one of module_id or package_id is provided
+        const { module_id, package_id, user_id, latitude, longitude } = req.body;
+        let { country_id, country_code } = req.body;
+
+        if (!req.body.latitude || !req.body.longitude) {
+            return res.status(400).json({ message: 'Latitude and longitude are required' });
+        }
+
+
+        if (!country_code) {
+            country_code = await getCountryCode(req.body.latitude, req.body.longitude);
+            if (!country_code) {
+                country_code = null
+            }
+        }
+        if (!country_id) {
+            const country = await Countries.findOne({ where: { code: country_code } })
+            if (!country) {
+                country_id = null;
+            }else{
+                country_id = country.id;
+            }
+        }
+
+
+
+        const newDownload = await Downloads.create({
+            module_id,
+            package_id,
+            user_id,
+            latitude,
+            longitude,
+            country_code,
+            country_id: country_id,
+        })
+
         res.status(200).json(newDownload);
     } catch (err) {
         console.log(err);
