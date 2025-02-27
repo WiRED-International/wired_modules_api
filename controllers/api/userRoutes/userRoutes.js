@@ -346,6 +346,29 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
   }
 });
 
+router.delete('/delete-account', auth, async (req, res) => {
+  try {
+    console.log("User making delete request:", req.user); // Debugging
+
+    if (!req.user || !req.user.id) {
+      return res.status(400).json({ message: 'User not found' });
+    }
+
+    // Fetch the user from the database
+    const user = await Users.findByPk(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User does not exist." });
+    }
+
+    await user.destroy(); // Now `destroy()` will work
+
+    res.status(200).json({ message: "Your account has been deleted." });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: err.message });
+  }
+});
 
 router.delete("/:id", auth, isAdmin, async (req, res) => {
   const userId = req.user.id; // Authenticated user's ID
