@@ -17,6 +17,9 @@ router.get('/', isSuperAdmin, async (req, res) => {
         if (package_id) whereConditions.package_id = package_id;
         if (user_id) whereConditions.user_id = user_id;
         if (country_code) whereConditions.country_code = country_code;
+        // Ensure latitude and longitude are not null for the general downloads querying
+        whereConditions.latitude = { [Op.ne]: null };
+        whereConditions.longitude = { [Op.ne]: null };
 
         // if the user is sorting by module name, then we don't show results where module_id is null and vice versa for package
         if (sort_by === 'module') {
@@ -138,11 +141,6 @@ router.post('/', async (req, res) => {
     try {
         const { module_id, package_id, user_id, latitude, longitude } = req.body;
         let { country_id, country_code } = req.body;
-
-        if (!req.body.latitude || !req.body.longitude) {
-            return res.status(400).json({ message: 'Latitude and longitude are required' });
-        }
-
 
         if (!country_code) {
             country_code = await getCountryCode(req.body.latitude, req.body.longitude);

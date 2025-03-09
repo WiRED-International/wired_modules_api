@@ -39,11 +39,11 @@ Downloads.init(
 
     latitude: {
       type: DataTypes.DECIMAL(10, 8),
-      allowNull: false,
+      allowNull: true,
     },
     longitude: {
         type: DataTypes.DECIMAL(11, 8),
-        allowNull: false,
+        allowNull: true,
     },
     download_date: {
       type: DataTypes.INTEGER, // Store Unix timestamp as an integer
