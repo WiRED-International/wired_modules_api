@@ -27,7 +27,7 @@ const generateDownloads = async () => {
       }
       const country = await Countries.findOne({ where: { code: downloadData.country_code } });
       if (!country) {
-        console.error('Country code could not be determined');
+        // console.error('Country code could not be determined');
         continue;
       }
       downloadData.country_id = country.id;

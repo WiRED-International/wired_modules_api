@@ -132,6 +132,16 @@ const users = [
     city_id: 1,
     organization_id: 1,
   },
+  {
+    first_name: "Michael",
+    last_name: "Seaman",
+    email: "mseaman26@gmail.com",
+    password: "password",
+    role_id: 3,
+    country_id: 1,
+    city_id: 1,
+    organization_id: 1,
+  },
 ];
 
 const usersSeed = async () => {
