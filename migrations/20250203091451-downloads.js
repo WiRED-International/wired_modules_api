@@ -67,17 +67,17 @@ module.exports = {
     });
 
     // Add a constraint to ensure at least one of module_id or package_id is provided
-    await queryInterface.addConstraint('downloads', {
-      fields: ['module_id', 'package_id'],
-      type: 'check',
-      where: {
-        [Sequelize.Op.or]: [
-          { module_id: { [Sequelize.Op.ne]: null } },
-          { package_id: { [Sequelize.Op.ne]: null } },
-        ],
-      },
-      name: 'downloads_module_or_package_required',
-    });
+    // await queryInterface.addConstraint('downloads', {
+    //   fields: ['module_id', 'package_id'],
+    //   type: 'check',
+    //   where: {
+    //     [Sequelize.Op.or]: [
+    //       { module_id: { [Sequelize.Op.ne]: null } },
+    //       { package_id: { [Sequelize.Op.ne]: null } },
+    //     ],
+    //   },
+    //   name: 'downloads_module_or_package_required',
+    // });
   },
 
 
