@@ -6,7 +6,8 @@ module.exports = {
     await queryInterface.addColumn('countries', 'code', {
       type: Sequelize.DataTypes.STRING,
       allowNull: false,
-      unique: true
+      unique: true,
+      defaultValue: 'UKNOWN',
     });
   },
 
