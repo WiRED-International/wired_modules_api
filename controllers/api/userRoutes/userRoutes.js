@@ -1,5 +1,5 @@
 const router = require("express").Router();
-const { Users, Roles, QuizScores, Modules } = require('../../../models');
+const { Users, Roles, QuizScores, Modules, Countries } = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require("../../../middleware/isAdmin");
 const { Op } = require("sequelize");
@@ -53,6 +53,11 @@ router.get("/", auth, isAdmin, async (req, res) => {
           as: "role",
           attributes: ["name"],
         },
+        {
+          model: Countries,
+          as: "country",
+          attributes: ["name"],
+        },
       ],
     });
 
@@ -81,6 +86,11 @@ router.get('/me', auth, async (req, res) => {
               as: 'module', 
               attributes: ['id', 'name', 'module_id',],
             },
+            {
+              model: Countries,
+              as: 'country',
+              attributes: ['name'],
+            }
           ],
         },
       ],
@@ -140,6 +150,11 @@ router.get("/search", auth, isAdmin, async (req, res) => {
           as: "role",
           attributes: ["name"],
         },
+        {
+          model: Countries,
+          as: "country",
+          attributes: ["name"],
+        }
       ],
     });
 
@@ -166,7 +181,18 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
         "organization_id",
         "role_id",
       ],
-      include: [{ model: Roles, as: "role", attributes: ["name"] }],
+      include: [
+        { 
+          model: Roles, 
+          as: "role", 
+          attributes: ["name"] 
+        },
+        { 
+          model: Countries, 
+          as: "country", 
+          attributes: ["name"] 
+        },
+      ],
     });
 
     //
