@@ -86,12 +86,12 @@ router.get('/me', auth, async (req, res) => {
               as: 'module', 
               attributes: ['id', 'name', 'module_id',],
             },
-            {
-              model: Countries,
-              as: 'country',
-              attributes: ['name'],
-            }
           ],
+        },
+        {
+          model: Countries,
+          as: 'country',
+          attributes: ['name'],
         },
       ],
     });

@@ -63,17 +63,16 @@ router.get('/:id', auth, async (req, res) => {
 });
 
 router.post('/', auth, async (req, res) => {
-  const { module_id, user_id, score, date_taken } = req.body;
-
-  console.log('Request body:', req.body); // Debug log
-
-  if (!module_id || !user_id || !score) {
-    return res.status(400).json({ message: 'module_id, user_id, and score are required' });
-  }
-
   try {
+    const { module_id, user_id, score, date_taken } = req.body;
 
-    // Ensure user_id and score are numbers
+    console.log('📩 Request body:', req.body); // Debug log
+
+    if (!module_id || !user_id || !score) {
+      return res.status(400).json({ message: 'module_id, user_id, and score are required' });
+    }
+
+    // Ensure user_id and score are valid numbers
     const parsedUserId = parseInt(user_id, 10);
     const parsedScore = parseFloat(score);
 
@@ -88,48 +87,31 @@ router.post('/', auth, async (req, res) => {
       return res.status(404).json({ message: 'Module not found' });
     }
 
-    // Use the `id` (primary key) of the matched module for associations
     const resolvedModuleId = module.id;
-    console.log('Resolved Module ID:', resolvedModuleId);
+    console.log('✅ Resolved Module ID:', resolvedModuleId);
 
-    // Check if a quiz score already exists for the given module `id` and user_id
-    const existingQuizScore = await QuizScores.findOne({
-      where: { module_id: resolvedModuleId, user_id },
-    });
-
-    if (existingQuizScore) {
-      // Update the existing record
-      console.log('Updating existing quiz score:', existingQuizScore);
-      existingQuizScore.score = score;
-      existingQuizScore.date_taken = date_taken || new Date(); // Update date_taken if provided
-      await existingQuizScore.save();
-
-      return res.status(200).json({
-        message: 'Quiz Score updated successfully',
-        quizScore: existingQuizScore,
-      });
-    }
-
-    // If no existing record, create a new one
-    const quizScore = await QuizScores.create({
+    // ✅ Use UPSERT instead of findOne + save() to prevent race conditions
+    const [quizScore, created] = await QuizScores.upsert({
       module_id: resolvedModuleId,
-      user_id,
-      score,
+      user_id: parsedUserId,
+      score: parsedScore,
       date_taken: date_taken || new Date(),
     });
 
-    res.status(201).json({
-      message: 'Quiz Score created successfully',
+    res.status(created ? 201 : 200).json({
+      message: created ? 'Quiz Score created successfully' : 'Quiz Score updated successfully',
       quizScore,
     });
+
   } catch (err) {
-    console.error('Error:', err);
+    console.error('❌ Error:', err);
     res.status(500).json({
-      message: 'Validation error',
+      message: 'Internal Server Error',
       errors: err.errors || [],
     });
   }
 });
+
 
 router.delete('/:id', auth, isAdmin, async (req, res) => {
   const { id } = req.params;
