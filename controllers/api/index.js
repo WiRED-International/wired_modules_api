@@ -38,9 +38,9 @@ router.use('/cities', citiesRoutes);
 router.use('/organizations', organizationsRoutes);
 router.use('/admin-permissions', adminPermissionsRoutes);
 router.use('/quiz-scores', quizScoreRoutes);
-router.use('/api/downloads', downloadsroutes);
+router.use('/downloads', downloadsroutes);
 router.use('/leaderboard', leaderboard);
-router.use('/api/googleAPIKey', googleAPIKeyRoute);
+router.use('/googleAPIKey', googleAPIKeyRoute);
 
 
 
