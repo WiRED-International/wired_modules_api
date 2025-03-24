@@ -80,12 +80,11 @@ router.get('/', isSuperAdmin, async (req, res) => {
             const lat = parseFloat(latitude);
             const lon = parseFloat(longitude);
             const earthRadiusMiles = 3958.8; // Earth's radius in miles
-
             whereConditions[Op.and] = Sequelize.literal(`
                 (${earthRadiusMiles} * acos(
-                    cos(radians(${lat})) * cos(radians(downloads.latitude)) * 
-                    cos(radians(downloads.longitude) - radians(${lon})) + 
-                    sin(radians(${lat})) * sin(radians(downloads.latitude))
+                    cos(radians(${lat})) * cos(radians(Downloads.latitude)) * 
+                    cos(radians(Downloads.longitude) - radians(${lon})) + 
+                    sin(radians(${lat})) * sin(radians(Downloads.latitude))
                 )) <= ${distance}
             `);
         }
