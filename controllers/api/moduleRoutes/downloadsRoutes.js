@@ -11,8 +11,6 @@ const  {formatDate, formatTime}  = require('../../../utils/formatDate');
 // Get all downloads
 router.get('/', isSuperAdmin, async (req, res) => {
     try {
-        //TODO: remove this line
-        console.log('here2')
         // Extract query parameters from the request
         const { module_id, package_id, user_id, latitude, longitude, start_date, end_date, module_name, package_name, sort_by, sort_dir, distance, country_code, output } = req.query;
 
@@ -69,8 +67,6 @@ router.get('/', isSuperAdmin, async (req, res) => {
             const direction = sort_dir && sort_dir.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
             if (sort_by === 'module') {
-                //TODO: delete console log
-                console.log('Sorting by module name');
 
                 order.push([
                     Sequelize.literal(`COALESCE(module.name, 'ZZZ') ${direction}`)
@@ -110,17 +106,16 @@ router.get('/', isSuperAdmin, async (req, res) => {
         });
         //if the output query parameter is set to csv, then we will return the data in csv format
         if (output === 'csv') {
-            const fields = ['id', 'module_id', 'package_id', 'user_id', 'latitude', 'longitude', 'country_code', 'download_date', 'download_time'];
+            const fields = [ 'module_name', 'package_name','download_date', 'download_time','user_id', 'latitude', 'longitude', 'country', ];
             const json2csvParser = new Parser({ fields });
 
             const formattedData = downloadData.map((item) => ({
-                id: item.id,
-                module_id: item.module_id,
-                package_id: item.package_id,
+                module_name: item.module?.name,
+                package_name: item.package?.name,
                 user_id: item.user_id,
                 latitude: item.latitude,
                 longitude: item.longitude,
-                country_code: item.country_code,
+                country: item.country.name,
                 download_time: formatTime(item.download_date),
                 download_date: formatDate(item.download_date),
             }));
@@ -133,8 +128,6 @@ router.get('/', isSuperAdmin, async (req, res) => {
             res.setHeader('Content-Disposition', `attachment; filename=download_${id}.csv`);
 
             // Send the CSV data as the response
-            //TODO: remove this line
-            console.log('here')
             fs.writeFileSync(`./test_csv_files/download_${id}.csv`, csv);
             return res.status(200).send(csv);
         }
@@ -149,7 +142,6 @@ router.get('/', isSuperAdmin, async (req, res) => {
 router.get('/:id', isSuperAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-
         // Fetch the download record by its primary key (id)
         const downloadData = await Downloads.findByPk(id, {
             include: [
