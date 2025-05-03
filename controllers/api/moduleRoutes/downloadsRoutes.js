@@ -5,7 +5,6 @@ const { Op } = require('sequelize');
 const Sequelize = require('sequelize');
 const getCountryCode = require('../../../utils/getCountryCode');
 const { Parser } = require('json2csv');
-const fs = require('fs');
 const  {formatDate, formatTime}  = require('../../../utils/formatDate');
 
 // Get all downloads
@@ -125,10 +124,9 @@ router.get('/', isSuperAdmin, async (req, res) => {
             // Set the response headers for CSV download
             const id = new Date().getTime();
             res.setHeader('Content-Type', 'text/csv');
-            res.setHeader('Content-Disposition', `attachment; filename=download_${id}.csv`);
+            res.setHeader('Content-Disposition', `attachment; filename=wired_health_downloads_${id}.csv`);
 
             // Send the CSV data as the response
-            fs.writeFileSync(`./test_csv_files/download_${id}.csv`, csv);
             return res.status(200).send(csv);
         }
         res.status(200).json(downloadData);
