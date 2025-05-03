@@ -4,12 +4,14 @@ const { Downloads, Modules, Packages, Users, Countries } = require('../../../mod
 const { Op } = require('sequelize');
 const Sequelize = require('sequelize');
 const getCountryCode = require('../../../utils/getCountryCode');
+const { Parser } = require('json2csv');
+const  {formatDate, formatTime}  = require('../../../utils/formatDate');
 
 // Get all downloads
 router.get('/', isSuperAdmin, async (req, res) => {
     try {
         // Extract query parameters from the request
-        const { module_id, package_id, user_id, latitude, longitude, start_date, end_date, module_name, package_name, sort_by, sort_dir, distance, country_code } = req.query;
+        const { module_id, package_id, user_id, latitude, longitude, start_date, end_date, module_name, package_name, sort_by, sort_dir, distance, country_code, output } = req.query;
 
         // Build the filtering criteria dynamically
         const whereConditions = {};
@@ -45,7 +47,7 @@ router.get('/', isSuperAdmin, async (req, res) => {
         //dynamically include the module and package models depending on the query parameters
         const moduleInclude = {
             model: Modules,
-            as: 'module', 
+            as: 'module',
         };
 
         if (module_name) {
@@ -62,8 +64,9 @@ router.get('/', isSuperAdmin, async (req, res) => {
         const order = [];
         if (sort_by) {
             const direction = sort_dir && sort_dir.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
-        
+
             if (sort_by === 'module') {
+
                 order.push([
                     Sequelize.literal(`COALESCE(module.name, 'ZZZ') ${direction}`)
                 ]);
@@ -71,7 +74,7 @@ router.get('/', isSuperAdmin, async (req, res) => {
                 order.push([
                     Sequelize.literal(`COALESCE(package.name, 'ZZZ') ${direction}`)
                 ]);
-            } else if(sort_by === 'date') {
+            } else if (sort_by === 'date') {
                 order.push(['download_date', direction]);
             }
         }
@@ -100,7 +103,32 @@ router.get('/', isSuperAdmin, async (req, res) => {
             ],
             order,
         });
+        //if the output query parameter is set to csv, then we will return the data in csv format
+        if (output === 'csv') {
+            const fields = [ 'module_name', 'package_name','download_date', 'download_time','user_id', 'latitude', 'longitude', 'country', ];
+            const json2csvParser = new Parser({ fields });
 
+            const formattedData = downloadData.map((item) => ({
+                module_name: item.module?.name,
+                package_name: item.package?.name,
+                user_id: item.user_id,
+                latitude: item.latitude,
+                longitude: item.longitude,
+                country: item.country.name,
+                download_time: formatTime(item.download_date),
+                download_date: formatDate(item.download_date),
+            }));
+            
+            const csv = json2csvParser.parse(formattedData);
+
+            // Set the response headers for CSV download
+            const id = new Date().getTime();
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', `attachment; filename=wired_health_downloads_${id}.csv`);
+
+            // Send the CSV data as the response
+            return res.status(200).send(csv);
+        }
         res.status(200).json(downloadData);
     } catch (err) {
         console.log(err);
@@ -111,8 +139,7 @@ router.get('/', isSuperAdmin, async (req, res) => {
 // Get a specific download by id
 router.get('/:id', isSuperAdmin, async (req, res) => {
     try {
-        const { id } = req.params; 
-
+        const { id } = req.params;
         // Fetch the download record by its primary key (id)
         const downloadData = await Downloads.findByPk(id, {
             include: [
@@ -127,11 +154,13 @@ router.get('/:id', isSuperAdmin, async (req, res) => {
             return res.status(404).json({ message: 'Download not found' });
         }
 
+
+
         // Return the found record
         res.status(200).json(downloadData);
     } catch (err) {
         console.log(err);
-        res.status(500).json({err});
+        res.status(500).json({ err });
     }
 });
 
@@ -151,7 +180,7 @@ router.post('/', async (req, res) => {
             const country = await Countries.findOne({ where: { code: country_code } })
             if (!country) {
                 country_id = null;
-            }else{
+            } else {
                 country_id = country.id;
             }
         }
