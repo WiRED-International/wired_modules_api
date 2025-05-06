@@ -76,7 +76,10 @@ router.get('/', isSuperAdmin, async (req, res) => {
                 ]);
             } else if (sort_by === 'date') {
                 order.push(['download_date', direction]);
+            } else if (sort_by === 'country') { 
+                order.push([Sequelize.literal(`COALESCE(country.name, 'ZZZ') ${direction}`)]);  // Sorting by country name
             }
+        
         }
         //if the user has provided latitude, longitude, and distance, then we will filter the results based on the distance from the provided coordinates
         if (latitude && longitude && distance !== undefined) {
