@@ -1,8 +1,7 @@
 const router = require('express').Router();
-const { QuizScores, Users, Modules } = require('../../../models');
+const { QuizScores, Modules } = require('../../../models');
 const auth = require('../../../middleware/auth');
 const isAdmin = require('../../../middleware/isAdmin');
-const isSuperAdmin = require('../../../middleware/isSuperAdmin');
 
 router.get('/', auth, async (req, res) => {
   const { userId } = req.query;
@@ -11,8 +10,10 @@ router.get('/', auth, async (req, res) => {
     let quizScores;
 
     if (req.user.isAdmin) {
-      // Admin: Fetch all scores or scores for a specific user
-      const whereClause = userId ? { user_id: userId } : {};
+    
+      const parsedUserId = userId ? parseInt(userId, 10) : null;
+      const whereClause = parsedUserId ? { user_id: parsedUserId } : {};
+
       quizScores = await QuizScores.findAll({
         where: whereClause,
         attributes: ['id', 'user_id', 'module_id', 'score', 'date_taken'],
@@ -66,8 +67,6 @@ router.post('/', auth, async (req, res) => {
   try {
     const { module_id, user_id, score, date_taken } = req.body;
 
-    console.log('📩 Request body:', req.body); // Debug log
-
     if (!module_id || !user_id || !score) {
       return res.status(400).json({ message: 'module_id, user_id, and score are required' });
     }
@@ -80,6 +79,11 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Invalid user_id or score' });
     }
 
+    // Only Admins and Super Admins allowed
+    if (req.user.roleId === 1) {
+      return res.status(403).json({ message: 'Access denied. Only Admins can create or edit quiz scores.' });
+    }
+
     // Find the module by the `module_id` field (not the primary key)
     const module = await Modules.findOne({ where: { module_id } });
 
@@ -88,9 +92,8 @@ router.post('/', auth, async (req, res) => {
     }
 
     const resolvedModuleId = module.id;
-    console.log('✅ Resolved Module ID:', resolvedModuleId);
 
-    // ✅ Use UPSERT instead of findOne + save() to prevent race conditions
+    // Use UPSERT instead of findOne + save() to prevent race conditions
     const [quizScore, created] = await QuizScores.upsert({
       module_id: resolvedModuleId,
       user_id: parsedUserId,
@@ -104,11 +107,42 @@ router.post('/', auth, async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ Error:', err);
+    console.error('Error:', err);
     res.status(500).json({
       message: 'Internal Server Error',
       errors: err.errors || [],
     });
+  }
+});
+
+router.put('/:id', auth, isAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { score, date_taken } = req.body;
+
+  try {
+    const quizScore = await QuizScores.findByPk(id);
+
+    if (!quizScore) {
+      return res.status(404).json({ message: 'Quiz Score not found' });
+    }
+
+    // Validate score
+    const parsedScore = parseFloat(score);
+    if (isNaN(parsedScore) || parsedScore < 0) {
+      return res.status(400).json({ message: 'Invalid score value provided.' });
+    }
+
+    await quizScore.update({
+      score: parsedScore,
+      date_taken: date_taken || quizScore.date_taken,
+    });
+
+    res.status(200).json({
+      message: 'Quiz Score updated successfully',
+      quizScore,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 

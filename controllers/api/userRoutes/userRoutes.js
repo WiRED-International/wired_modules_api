@@ -1,73 +1,63 @@
 const router = require("express").Router();
-const { Users, Roles, QuizScores, Modules, Countries } = require('../../../models');
+const { Users, Roles, QuizScores, Modules, Countries, Cities, Organizations, Specializations } = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require("../../../middleware/isAdmin");
+const { buildUserQueryFilters } = require("../../../middleware/accessControl");
 const { Op } = require("sequelize");
-
-const validRoles = [1, 2, 3];
-const ADMIN_ROLE_ID = 2;
-const SUPER_ADMIN_ROLE_ID = 3;
+const ROLES = require("../../../utils/roles")
 
 router.get("/", auth, isAdmin, async (req, res) => {
   const { countryId, cityId, organizationId, roleId } = req.query;
-  const userRoleId = req.user.roleId;
 
   try {
-    // Initialize the base `where` clause
-    let where = {};
+    const where = buildUserQueryFilters(req, { countryId, cityId, organizationId, roleId });
 
-    // Restrict data visibility based on user role
-    if (userRoleId === ADMIN_ROLE_ID) {
-      // Admin: Can only view users within the same organization
-      where.organization_id = req.user.organization_id;
-
-      // Optionally filter within the allowed scope
-      where = {
-        ...where,
-        ...(countryId && { country_id: countryId }),
-        ...(cityId && { city_id: cityId }),
-        ...(roleId && { role_id: roleId }),
-      };
-    } else if (userRoleId === SUPER_ADMIN_ROLE_ID) {
-      // Super-Admin Can view any user
-      where = {
-        ...(countryId && { country_id: countryId }),
-        ...(cityId && { city_id: cityId }),
-        ...(organizationId && { organization_id: organizationId }),
-        ...(roleId && { role_id: roleId }),
-      };
-    } else {
-      // Role not recognized, deny access (should not happen due to `isAdmin`)
-      return res
-        .status(403)
-        .json({ message: "You do not have permission to view users" });
-    }
-
-    // Fetch the users with filters
     const users = await Users.findAll({
       where,
-      attributes: ["id", "first_name", "last_name", "email", "organization_id"],
+      attributes: ["id", "first_name", "last_name", "email",],
       include: [
-        {
-          model: Roles,
-          as: "role",
+        { model: Organizations,
+          as: "organization",
           attributes: ["name"],
         },
-        {
-          model: Countries,
-          as: "country",
+        { model: Roles, 
+          as: "role", 
+          attributes: ["name"], 
+        },
+        { model: Countries, 
+          as: "country", 
+          attributes: ["name"], 
+        },
+        { model: Cities,
+          as: "city",
           attributes: ["name"],
         },
+        { 
+          model: QuizScores, 
+          as: 'quizScores', 
+          attributes: ['score', 'date_taken'],
+          include: [
+            {
+              model: Modules, 
+              as: 'module', 
+              attributes: ['name', 'module_id',],
+            },
+          ],
+        },
+        {
+          model: Specializations,
+          as: 'specializations',
+          attributes: ['name'],
+        }
       ],
     });
 
-    res.status(200).json(users);
+    return res.status(200).json(users);
   } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: err.message });
+    console.error(err);
+    return res.status(403).json({ message: err.message });
   }
 });
-
 
 
 router.get('/me', auth, async (req, res) => {
@@ -100,74 +90,83 @@ router.get('/me', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.status(200).json(user);
+    return res.status(200).json(user);
   } catch (err) {
     console.log(err);
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 });
 
 router.get("/search", auth, isAdmin, async (req, res) => {
   //users can be searched by one or more of the following fields. searches are case-insensitive
-  const { email, first_name, last_name } = req.query;
-  const userRoleId = req.user.roleId;
+  const { email, first_name, last_name, countryId, cityId, organizationId, roleId } = req.query;
 
   try {
-    // Initialize the base `where` clause
-    let whereClause = {};
-    // Restrict data visibility based on user role
-
-    if (userRoleId === ADMIN_ROLE_ID) {
-      // Admin: Can only view users within the same organization
-      whereClause.organization_id = req.user.organization_id;
-      //if user is neither admin nor super admin, deny access
-    } else if (userRoleId !== SUPER_ADMIN_ROLE_ID) {
-      return res
-        .status(403)
-        .json({ message: "You do not have permission to search for users" });
-    }
+    const where = buildUserQueryFilters(req, { countryId, cityId, organizationId, roleId });
 
     // Add case-insensitive search filters if provided
     if (email) {
-      whereClause.email = { [Op.like]: '%' + email + '%' }
+      where.email = { [Op.like]: '%' + email + '%' }
     }
 
     if (first_name) {
-      whereClause.first_name = { [Op.like]: '%' + first_name + '%' }
+      where.first_name = { [Op.like]: '%' + first_name + '%' }
     }
 
     if (last_name) {
-      whereClause.last_name = { [Op.like]: '%' + last_name + '%' }
+      where.last_name = { [Op.like]: '%' + last_name + '%' }
     }
 
     // Fetch the users with filters
     const users = await Users.findAll({
-      where: whereClause, // Use the correct `where` object
-      attributes: ["id", "first_name", "last_name", "email", "organization_id"],
+      where, // Use the correct `where` object
+      attributes: ["id", "first_name", "last_name", "email",],
       include: [
-        {
-          model: Roles,
-          as: "role",
+        { model: Organizations,
+          as: "organization",
           attributes: ["name"],
         },
-        {
-          model: Countries,
-          as: "country",
+        { model: Roles, 
+          as: "role", 
+          attributes: ["name"], 
+        },
+        { model: Countries, 
+          as: "country", 
+          attributes: ["name"], 
+        },
+        { model: Cities,
+          as: "city",
           attributes: ["name"],
+        },
+        { 
+          model: QuizScores, 
+          as: 'quizScores', 
+          attributes: ['score', 'date_taken'],
+          include: [
+            {
+              model: Modules, 
+              as: 'module', 
+              attributes: ['name', 'module_id',],
+            },
+          ],
+        },
+        {
+          model: Specializations,
+          as: 'specializations',
+          attributes: ['name'],
         }
       ],
     });
 
-    res.status(200).json(users);
+    return res.status(200).json(users);
   } catch (err) {
     console.log(err);
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 });
 
 router.get("/:id", auth, isAdmin, async (req, res) => {
   const targetUserId = req.params.id;
-  const userRoleId = req.user.roleId;
 
   try {
     // Find the user by ID
@@ -178,55 +177,71 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
         "first_name",
         "last_name",
         "email",
-        "organization_id",
-        "role_id",
       ],
       include: [
-        { 
-          model: Roles, 
+        { model: Organizations,
+          as: "organization",
+          attributes: ["name"],
+        },
+        { model: Roles, 
           as: "role", 
-          attributes: ["name"] 
+          attributes: ["name"], 
+        },
+        { model: Countries, 
+          as: "country", 
+          attributes: ["name"], 
+        },
+        { model: Cities,
+          as: "city",
+          attributes: ["name"],
         },
         { 
-          model: Countries, 
-          as: "country", 
-          attributes: ["name"] 
+          model: QuizScores, 
+          as: 'quizScores', 
+          attributes: ['score', 'date_taken'],
+          include: [
+            {
+              model: Modules, 
+              as: 'module', 
+              attributes: ['name', 'module_id',],
+            },
+          ],
         },
+        {
+          model: Specializations,
+          as: 'specializations',
+          attributes: ['name'],
+        }
       ],
     });
-
-    //
 
     // Check if user exists
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Role-based access control (non-admins basically cant query any user)
-    if (userRoleId === ADMIN_ROLE_ID) {
-      // admins can only view users within the same organization
-      if (user.organization_id !== req.user.organization_id) {
-        return res
-          .status(403)
-          .json({
-            message:
-              "Access denied, you can only access users from within your organization",
-          });
+    const requester = req.user;
+
+    if (requester.roleId === ROLES.ADMIN) {
+      if (user.organization_id !== requester.organization_id || user.country_id !== requester.country_id) {
+        return res.status(403).json({ message: "Access denied. You can only view users within your assigned organization and country." });
       }
-    } else if (userRoleId !== SUPER_ADMIN_ROLE_ID) {
-      // super admins can view any user; other roles cannot
-      return res
-        .status(403)
-        .json({ message: "Access denied, contact your system administrator" });
+
+      // Optional city restriction
+      if (requester.city_id && user.city_id !== requester.city_id) {
+        return res.status(403).json({ message: "Access denied. You can only view users within your assigned city." });
+      }
+
+      // Role restriction
+      if (user.role_id !== ROLES.USER) {
+        return res.status(403).json({ message: "Access denied. Admins can only view users with role 'User'." });
+      }
     }
 
-    // Return the user details
-    res.status(200).json(user);
+    return res.status(200).json(user);
   } catch (err) {
-    console.log(err);
-    res
-      .status(500)
-      .json({ message: "An error occurred while fetching the user" });
+    console.error(err);
+    return res.status(403).json({ message: err.message });
   }
 });
 
@@ -290,70 +305,83 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
   //normal users have been blocked by the isAdmin middleware
 
   try {
-    //if the user is attempting to update the role_id
-    if (updatedData.role_id !== undefined) {
-      //if the user is not a super admin, they cannot update the role_id
-      if (userRoleId !== SUPER_ADMIN_ROLE_ID) {
-        return res
-          .status(403)
-          .json({ message: "You do not have permission to update a user's role_id" });
-      }
-      //check if the role_id for the target user is valid
-      if (!validRoles.includes(updatedData.role_id)) {
-        return res
-          .status(400)
-          .json({ message: "Invalid role_id provided for user being updated" });
-      }
-    }
-
- 
-
     // Fetch the target user
     const targetUser = await Users.findByPk(targetUserId);
 
     if (!targetUser) {
       return res.status(404).json({ message: "Target user not found" });
     }
-    const targetUserIsAdmin = targetUser.role_id === ADMIN_ROLE_ID;
-    const targetUserIsSuperAdmin = targetUser.role_id === SUPER_ADMIN_ROLE_ID;
 
-    // aditional role based access control. these are after the fetch of the target user because we need to know certain details about the target user to determine access. could/should we have done this before the fetch by getting the info some other way? 
+    const targetUserIsAdmin = targetUser.role_id === ROLES.ADMIN;
+    const targetUserIsSuperAdmin = targetUser.role_id === ROLES.SUPER_ADMIN;
+    const disallowedFields = ["country_id", "city_id", "organization_id"];
+    // Prevent Admins from modifying sensitive fields
+    if (userRoleId !== ROLES.SUPER_ADMIN) {
+      
+      const invalidFields = Object.keys(updatedData).filter(key => disallowedFields.includes(key));
 
-    // if a user is admin, they cannot update a user outside of their organization
-    if (userRoleId === ADMIN_ROLE_ID && targetUser.organization_id !== req.user.organization_id) {
-      return res.status(403).json({
-        message:
-          "You do not have permission to update a user outside of your organization",
-      });
-    }
-    // if a user is admin, they cannot update any other admin or any super admin
-    if (userRoleId === ADMIN_ROLE_ID && (targetUserIsAdmin || targetUserIsSuperAdmin)) {
-      return res.status(403).json({
-        message: "You do not have permission to update another admin",
-      });
+      if (invalidFields.length > 0) {
+        return res.status(400).json({
+          message: `You are not allowed to update the following fields: ${invalidFields.join(", ")}`
+        });
+      }
     }
 
-    // Ensure only allowed fields are updated
+    if (userRoleId === ROLES.SUPER_ADMIN && updatedData.role_id !== undefined) {
+      const parsedRoleId = parseInt(updatedData.role_id);
+      if (![ROLES.USER, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(parsedRoleId)) {
+        return res.status(400).json({ message: "Invalid role_id provided for user being updated" });
+      }
+      updatedData.role_id = parsedRoleId;
+    }
+
+    // First: Validate allowed update fields
     const allowedUpdates = [
       "first_name",
       "last_name",
       "email",
-      "password",
-      userRoleId === SUPER_ADMIN_ROLE_ID ? "role_id" : null,
-      "country_id",
-      "city_id",
-      "organization_id",
-    ];
+      ...(userRoleId === ROLES.SUPER_ADMIN ? ["role_id", "country_id", "city_id", "organization_id"] : []),
+    ].filter(Boolean);
+
     const filteredUpdates = Object.keys(updatedData)
       .filter((key) => allowedUpdates.includes(key))
       .reduce((obj, key) => {
         obj[key] = updatedData[key];
         return obj;
       }, {});
-    //if no valid updates are provided
+
+    if (userRoleId === ROLES.SUPER_ADMIN && updatedData.role_id !== undefined) {
+      filteredUpdates.role_id = updatedData.role_id;
+    }
+
+    // No valid fields provided, return 400 before any access control checks
     if (Object.keys(filteredUpdates).length === 0) {
       return res.status(400).json({ message: "No valid updates provided" });
     }
+
+    // aditional role based access control. these are after the fetch of the target user because we need to know certain details about the target user to determine access. could/should we have done this before the fetch by getting the info some other way? 
+    // if a user is admin, they cannot update a user outside of their organization
+    if (userRoleId === ROLES.ADMIN) {
+      // if a user is admin, they cannot update any other admin or any super admin
+      if (targetUserIsAdmin || targetUserIsSuperAdmin) {
+        return res.status(403).json({
+          message: "You do not have permission to update another admin",
+        });
+      }
+
+      if (targetUser.organization_id !== req.user.organization_id || targetUser.country_id !== req.user.country_id) {
+        return res.status(403).json({
+          message: "Access denied. You can only update users within your assigned country and organization.",
+        });
+      }
+
+      if (req.user.city_id && targetUser.city_id !== req.user.city_id) {
+        return res.status(403).json({
+          message: "Access denied. You can only update users within your assigned city.",
+        });
+      }
+    }
+
     // Perform the update
     await targetUser.update(filteredUpdates);
 
@@ -362,13 +390,13 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
       attributes: { exclude: ["password"] }, // Exclude sensitive fields
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "User updated successfully",
       user: updatedUser,
     });
   } catch (err) {
     console.log(err);
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 });
 
@@ -389,10 +417,10 @@ router.delete('/delete-account', auth, async (req, res) => {
 
     await user.destroy(); // Now `destroy()` will work
 
-    res.status(200).json({ message: "Your account has been deleted." });
+    return res.status(200).json({ message: "Your account has been deleted." });
   } catch (err) {
     console.log(err);
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 });
 
@@ -419,7 +447,7 @@ router.delete("/:id", auth, isAdmin, async (req, res) => {
     }
 
     // Role-based deletion rules
-    if(userRoleId === ADMIN_ROLE_ID){
+    if(userRoleId === ROLES.ADMIN){
       // Admins can only delete users within the same organization
       if(targetUser.organization_id !== userOrganizationId){
         return res.status(403).json({
@@ -428,7 +456,7 @@ router.delete("/:id", auth, isAdmin, async (req, res) => {
       }
     }
     // admin cannot delete another admin or a super admin
-    if(userRoleId === ADMIN_ROLE_ID && (targetUserIsAdmin || targetUserIsSuperAdmin)){
+    if(userRoleId === ROLES.ADMIN && (targetUserIsAdmin || targetUserIsSuperAdmin)){
       return res.status(403).json({
         message: "You do not have permission to delete another admin",
       });

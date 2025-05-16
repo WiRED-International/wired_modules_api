@@ -24,11 +24,11 @@ router.get('/names', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const package = await Packages.findByPk(req.params.id);
-    if (!package) {
+    const packageData = await Packages.findByPk(req.params.id);
+    if (!packageData) {
       return res.status(404).json({ message: 'Package not found' });
     }
-    res.status(200).json(package);
+    res.status(200).json(packageData);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -56,12 +56,12 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const { name, description, letters, version, downloadLink, packageSize, } = req.body;
   try {
-    const package = await Packages.findByPk(req.params.id);
-    if (!package) {
+    const packageData = await Packages.findByPk(req.params.id);
+    if (!packageData) {
       return res.status(404).json({ message: 'Package not found' });
     }
-    await package.update({
-        name: name || package.name,
+    await packageData.update({
+        name: name || packageData.name,
         description,
         letters,
         version,
@@ -69,7 +69,7 @@ router.put('/:id', async (req, res) => {
         packageSize,
     });
 
-    res.status(200).json({ message: "Package updated successfully", package});
+    res.status(200).json({ message: "Package updated successfully", package: packageData});
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -77,11 +77,11 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const package = await Packages.findByPk(req.params.id);
-    if (!package) {
+    const packageData = await Packages.findByPk(req.params.id);
+    if (!packageData) {
       return res.status(404).json({ message: 'Package not found' });
     }
-    await package.destroy();
+    await packageData.destroy();
     res.status(200).json({ message: 'Package deleted successfully' });
   } catch (err) {
     res.status(500).json({ message: err.message });

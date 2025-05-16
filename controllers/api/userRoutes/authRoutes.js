@@ -38,6 +38,8 @@ router.post('/register', async (req, res) => {
         id: newUser.id, 
         email: newUser.email, 
         roleId: newUser.role_id,
+        country_id: newUser.country_id,
+        city_id: newUser.city_id,
         //adding organization_id to the token so it can be used in certain queries
         organization_id: newUser.organization_id,
       }, 
@@ -67,6 +69,8 @@ router.post('/login', async (req, res) => {
         id: user.id, 
         email: user.email, 
         roleId: user.role_id,
+        country_id: user.country_id,
+        city_id: user.city_id,
         //adding organization_id to the token so it can be used in certain queries
         organization_id: user.organization_id,
       }, 
@@ -83,6 +87,9 @@ router.post('/login', async (req, res) => {
         roleId: user.role_id,
         firstName: user.first_name,
         lastName: user.last_name,
+        countryId: user.country_id,
+        cityId: user.city_id,
+        organizationId: user.organization_id,
         createdAt: user.createdAt,
       },
      });
