@@ -1,12 +1,10 @@
-const USER_ROLE_ID = 1; 
-const ADMIN_ROLE_ID = 2;
-const SUPER_ADMIN_ROLE_ID = 3;
+const ROLES = require('../utils/roles');
 
 function buildUserQueryFilters(req, allowedFilters = {}) {
   const userRoleId = req.user.roleId;
   const filters = {};
 
-  if (userRoleId === ADMIN_ROLE_ID) {
+  if (userRoleId === ROLES.ADMIN) {
     // Admins can only view users in their assigned country, city, and organization
     filters.organization_id = req.user.organization_id;
     filters.country_id = req.user.country_id;
@@ -22,10 +20,10 @@ function buildUserQueryFilters(req, allowedFilters = {}) {
 
 
     // Admins can only view Users
-    filters.role_id = USER_ROLE_ID;
+    filters.role_id = ROLES.USER;
 
     // Block attempts to override this restriction via query params
-    if (allowedFilters.roleId && allowedFilters.roleId != USER_ROLE_ID) {
+    if (allowedFilters.roleId && allowedFilters.roleId != ROLES.USER) {
       throw new Error("Admins can only view users with role 'User'.");
     }
 
@@ -37,7 +35,7 @@ function buildUserQueryFilters(req, allowedFilters = {}) {
       throw new Error("Admins can only filter within their assigned country and organization.");
     }
 
-  } else if (userRoleId === SUPER_ADMIN_ROLE_ID) {
+  } else if (userRoleId === ROLES.SUPER_ADMIN) {
     // Super Admin: Free to apply any filters
     if (allowedFilters.countryId) {
       filters.country_id = allowedFilters.countryId;
