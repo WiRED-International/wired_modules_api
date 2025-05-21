@@ -1,4 +1,4 @@
-const app = require('./app'); // ✅ Import the app instance
+const app = require('./app');
 const sequelize = require('./config/connection');
 const port = process.env.PORT || 3000;
 
