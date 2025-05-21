@@ -1,4 +1,5 @@
-const { Modules, SubCategories, Letters } = require('../models');
+const { Modules, SubCategories, Letters, Users, Specializations } = require('../models');
+const sequelize = require('../config/connection');
 
 // Seed the many to many relationship between modules and subCategories
 const seedPivotTable = async () => { 
@@ -290,6 +291,39 @@ const seedPivotTable = async () => {
     } catch (error) {
         console.error('Error seeding pivot table:', error); 
     }
- };
+
+    console.log('Seeding user_specializations...');
+    const users = await Users.findAll();
+    const specializations = await Specializations.findAll();
+
+    if (!users.length || !specializations.length) {
+      throw new Error('No users or specializations found. Did you seed them first?');
+    }
+
+    const pivotEntries = [];
+
+    users.forEach(user => {
+      const randomSpecs = specializations
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 2); // 2 random specs per user
+
+      randomSpecs.forEach(spec => {
+        pivotEntries.push({
+          user_id: user.id,
+          specialization_id: spec.id,
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+      });
+    });
+
+    await sequelize.getQueryInterface().bulkInsert('user_specializations', pivotEntries);
+
+    console.log('user_specializations seeded successfully!');
+    console.log('Pivot table seeded successfully!');
+//   } catch (error) {
+//     console.error('Error seeding pivot table:', error);
+//   }
+};
 
  seedPivotTable();
