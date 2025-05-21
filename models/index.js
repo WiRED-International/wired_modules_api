@@ -13,7 +13,6 @@ const QuizScores = require('./moduleModels/quizScores');
 const Downloads = require('./moduleModels/downloads');
 const Packages = require('./moduleModels/packages');
 const Specializations = require('./userModels/specializations');
-const UserSpecializations = require('./userModels/userSpecializations');
 
 // User-related associations
 Users.hasMany(QuizScores, { as: 'quizScores', foreignKey: 'user_id' });
@@ -97,5 +96,4 @@ module.exports = {
   Downloads,
   Packages,
   Specializations,
-  UserSpecializations,
 };
