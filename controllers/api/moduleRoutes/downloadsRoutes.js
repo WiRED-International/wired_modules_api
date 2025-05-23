@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const isSuperAdmin = require('../../../middleware/isSuperAdmin');
+const auth = require('../../../middleware/auth');
 const { Downloads, Modules, Packages, Users, Countries } = require('../../../models')
 const { Op } = require('sequelize');
 const Sequelize = require('sequelize');
@@ -8,7 +9,7 @@ const { Parser } = require('json2csv');
 const  {formatDate, formatTime}  = require('../../../utils/formatDate');
 
 // Get all downloads
-router.get('/', isSuperAdmin, async (req, res) => {
+router.get('/', auth, isSuperAdmin, async (req, res) => {
     try {
         // Extract query parameters from the request
         const { module_id, package_id, user_id, latitude, longitude, start_date, end_date, module_name, package_name, sort_by, sort_dir, distance, country_code, output } = req.query;
@@ -140,7 +141,7 @@ router.get('/', isSuperAdmin, async (req, res) => {
 });
 
 // Get a specific download by id
-router.get('/:id', isSuperAdmin, async (req, res) => {
+router.get('/:id', auth, isSuperAdmin, async (req, res) => {
     try {
         const { id } = req.params;
         // Fetch the download record by its primary key (id)
@@ -208,7 +209,7 @@ router.post('/', async (req, res) => {
 });
 
 // DELETE by id
-router.delete('/:id', isSuperAdmin, async (req, res) => {
+router.delete('/:id', auth, isSuperAdmin, async (req, res) => {
     try {
         const { id } = req.params; // Extract the ID from the URL parameter
 

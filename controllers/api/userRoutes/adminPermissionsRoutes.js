@@ -1,8 +1,10 @@
 const router = require('express').Router();
 const { AdminPermissions, Users, Roles } = require('../../../models');
 const isSuperAdmin = require('../../../middleware/isSuperAdmin');
+const auth = require('../../../middleware/auth');
 
-router.get('/', isSuperAdmin, async (req, res) => {
+
+router.get('/', auth, isSuperAdmin, async (req, res) => {
     const { adminId, countryId, cityId, organizationId, roleId } = req.query;
 
     try {
@@ -37,7 +39,7 @@ router.get('/', isSuperAdmin, async (req, res) => {
     }
 });
 
-router.post('/', isSuperAdmin, async (req, res) => {
+router.post('/', auth, isSuperAdmin, async (req, res) => {
     const { adminId, countryId, cityId, organizationId, roleId } = req.body;
 
     try {
@@ -76,7 +78,7 @@ router.post('/', isSuperAdmin, async (req, res) => {
     }
 });
 
-router.put('/:id', isSuperAdmin, async (req, res) => {
+router.put('/:id', auth, isSuperAdmin, async (req, res) => {
     const { id } = req.params;
     const { countryId, cityId, organizationId, roleId } = req.body;
 
@@ -117,7 +119,7 @@ router.put('/:id', isSuperAdmin, async (req, res) => {
     }
 });
 
-router.delete('/:id', isSuperAdmin, async (req, res) => {
+router.delete('/:id', auth, isSuperAdmin, async (req, res) => {
     const { id } = req.params;
 
     try {
