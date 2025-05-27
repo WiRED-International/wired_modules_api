@@ -18,6 +18,7 @@ const quizScoreRoutes = require('./moduleRoutes/quizScoreRoutes');
 const downloadsroutes = require('./moduleRoutes/downloadsRoutes')
 const leaderboard = require('./moduleRoutes/leaderboard');
 const googleAPIKeyRoute = require('./googleAPIKeyRoute');
+const emailRoutes = require('./emailRoutes');
 
 
 router.use('/modules', modulesRoutes);
@@ -41,6 +42,7 @@ router.use('/quiz-scores', quizScoreRoutes);
 router.use('/api/downloads', downloadsroutes);
 router.use('/leaderboard', leaderboard);
 router.use('/api/googleAPIKey', googleAPIKeyRoute);
+router.use('/email', emailRoutes);
 
 
 

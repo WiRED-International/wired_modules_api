@@ -1,5 +1,5 @@
 const router = require("express").Router();
-const { Users, Roles, QuizScores, Modules, Countries } = require('../../../models');
+const { Users, Roles, QuizScores, Modules, Countries, Organizations } = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require("../../../middleware/isAdmin");
 const { Op } = require("sequelize");
@@ -76,6 +76,11 @@ router.get('/me', auth, async (req, res) => {
     const user = await Users.findByPk(req.user.id, {
       attributes: ['id', 'first_name', 'last_name', 'email', 'createdAt'], 
       include: [
+        {
+          model: Roles,
+          as: 'role',
+          attributes: ['name'],
+        },
         { 
           model: QuizScores, 
           as: 'quizScores', 
@@ -91,6 +96,11 @@ router.get('/me', auth, async (req, res) => {
         {
           model: Countries,
           as: 'country',
+          attributes: ['name'],
+        },
+        {
+          model: Organizations,
+          as: 'organization',
           attributes: ['name'],
         },
       ],
