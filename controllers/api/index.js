@@ -42,7 +42,7 @@ router.use('/quiz-scores', quizScoreRoutes);
 router.use('/api/downloads', downloadsroutes);
 router.use('/leaderboard', leaderboard);
 router.use('/api/googleAPIKey', googleAPIKeyRoute);
-router.use('/specializations', specializationsRoutes);
+router.use('/api/specializations', specializationsRoutes);
 
 
 

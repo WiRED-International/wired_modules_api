@@ -18,19 +18,19 @@ router.get("/", auth, isAdmin, async (req, res) => {
       include: [
         { model: Organizations,
           as: "organization",
-          attributes: ["name"],
+          attributes: ["name", "id"],
         },
         { model: Roles, 
           as: "role", 
-          attributes: ["name"], 
+          attributes: ["name", "id"], 
         },
         { model: Countries, 
           as: "country", 
-          attributes: ["name"], 
+          attributes: ["name", "id"], 
         },
         { model: Cities,
           as: "city",
-          attributes: ["name"],
+          attributes: ["name", "id"],
         },
         { 
           model: QuizScores, 
@@ -47,7 +47,7 @@ router.get("/", auth, isAdmin, async (req, res) => {
         {
           model: Specializations,
           as: 'specializations',
-          attributes: ['name'],
+          attributes: ['name', 'id'],
         }
       ],
     });
@@ -81,7 +81,7 @@ router.get('/me', auth, async (req, res) => {
         {
           model: Countries,
           as: 'country',
-          attributes: ['name'],
+          attributes: ['name', 'id'],
         },
       ],
     });
@@ -124,15 +124,15 @@ router.get("/search", auth, isAdmin, async (req, res) => {
       include: [
         { model: Organizations,
           as: "organization",
-          attributes: ["name"],
+          attributes: ["name", "id"],
         },
         { model: Roles, 
           as: "role", 
-          attributes: ["name"], 
+          attributes: ["name", "id"], 
         },
         { model: Countries, 
           as: "country", 
-          attributes: ["name"], 
+          attributes: ["name", "id"], 
         },
         { model: Cities,
           as: "city",
