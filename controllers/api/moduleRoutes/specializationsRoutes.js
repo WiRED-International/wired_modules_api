@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Specializations = require('../../../models');
+const { Specializations } = require('../../../models');
 const auth = require('../../../middleware/auth');
 const isAdmin = require('../../../middleware/isAdmin');
 

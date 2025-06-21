@@ -14,6 +14,10 @@ const Downloads = require('./moduleModels/downloads');
 const Packages = require('./moduleModels/packages');
 const Specializations = require('./userModels/specializations');
 
+const Exam = require('./examModels/exam');
+const ExamQuestions = require('./examModels/examQuestions');
+const ExamSession = require('./examModels/examSession');
+
 // User-related associations
 Users.hasMany(QuizScores, { as: 'quizScores', foreignKey: 'user_id' });
 QuizScores.belongsTo(Users, { as: 'user', foreignKey: 'user_id' });
@@ -32,6 +36,16 @@ Roles.hasMany(Users, { as: 'users', foreignKey: 'role_id' });
 
 Users.belongsToMany(Specializations, { as: 'specializations', through: 'user_specializations', foreignKey: 'user_id' });
 Specializations.belongsToMany(Users, { as: 'users', through: 'user_specializations', foreignKey: 'specialization_id' });
+
+Users.hasMany(ExamSession, { as: 'exam_session', foreignKey: 'user_id' });
+ExamSession.belongsTo(Users, { as: 'user', foreignKey: 'user_id' });
+
+// Exam-related associations
+Exam.hasMany(ExamQuestions, {  as: 'exam_questions', foreignKey: 'exam_id' });
+ExamQuestions.belongsTo(Exam, { as: 'exam', foreignKey: 'exam_id' });
+
+Exam.hasMany(ExamSession, { as: 'exam_session', foreignKey: 'exam_id' });
+ExamSession.belongsTo(Exam, { as: 'exam', foreignKey: 'exam_id' });
 
 // Module-related associations
 Modules.belongsTo(Modules, { as: 'RedirectedModule', foreignKey: 'redirect_module_id' });
@@ -96,4 +110,7 @@ module.exports = {
   Downloads,
   Packages,
   Specializations,
+  Exam,
+  ExamQuestions,
+  ExamSessions,
 };
