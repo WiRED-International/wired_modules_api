@@ -142,7 +142,19 @@ const users = [
     city_id: 1,
     organization_id: 1,
   },
+  // --- Additional 36 dummy users ---
+  ...Array.from({ length: 37 }).map((_, i) => ({
+    first_name: `User${i + 1}`,
+    last_name: `Test${i + 1}`,
+    email: `user${i + 1}@example.com`,
+    password: 'password',
+    role_id: (i % 3) + 1,
+    country_id: (i % 4) + 1,
+    city_id: (i % 5) + 1,
+    organization_id: (i % 4) + 1,
+  })),
 ];
+
 
 const usersSeed = async () => {
   try {
