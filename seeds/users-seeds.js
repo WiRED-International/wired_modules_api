@@ -142,15 +142,25 @@ const users = [
     city_id: 1,
     organization_id: 1,
   },
+  {
+    first_name: "abc",
+    last_name: "def",
+    email: "ghi.seaman@example.com",
+    password: "password",
+    role_id: 1,
+    country_id: 1,
+    city_id: 1,
+    organization_id: 1,
+  },
   // --- Additional 36 dummy users ---
   ...Array.from({ length: 37 }).map((_, i) => ({
-    first_name: `User${i + 1}`,
-    last_name: `Test${i + 1}`,
-    email: `user${i + 1}@example.com`,
+    first_name: `User${i + 16}`,
+    last_name: `Test${i + 16}`,
+    email: `user${i + 16}@example.com`,
     password: 'password',
     role_id: (i % 3) + 1,
     country_id: (i % 4) + 1,
-    city_id: (i % 5) + 1,
+    city_id: (i % 4) + 1,
     organization_id: (i % 4) + 1,
   })),
 ];
@@ -158,7 +168,8 @@ const users = [
 
 const usersSeed = async () => {
   try {
-
+    // Clear existing users
+    await Users.destroy({ where: {} });
     await Users.bulkCreate(users, { individualHooks: true });
     console.log('Users seeded successfully!');
   } catch (err) {

@@ -165,6 +165,68 @@ router.get("/search", auth, isAdmin, async (req, res) => {
   }
 });
 
+//search users by first name, last name, or email with one broad search query
+router.get("/search/broad", auth, isAdmin, async (req, res) => {
+  const { query } = req.query; // The search query
+
+  try {
+    const where = buildUserQueryFilters(req);
+
+    if (query) {
+      where[Op.or] = [
+        { first_name: { [Op.like]: `%${query}%` } },
+        { last_name: { [Op.like]: `%${query}%` } },
+        { email: { [Op.like]: `%${query}%` } }
+      ];
+    }
+
+    const users = await Users.findAll({
+      where,
+      attributes: ["id", "first_name", "last_name", "email",],
+      include: [
+        { model: Organizations,
+          as: "organization",
+          attributes: ["name", "id"],
+        },
+        { model: Roles, 
+          as: "role", 
+          attributes: ["name", "id"], 
+        },
+        { model: Countries, 
+          as: "country", 
+          attributes: ["name", "id"], 
+        },
+        { model: Cities,
+          as: "city",
+          attributes: ["name"],
+        },
+        { 
+          model: QuizScores, 
+          as: 'quizScores', 
+          attributes: ['score', 'date_taken'],
+          include: [
+            {
+              model: Modules, 
+              as: 'module', 
+              attributes: ['name', 'module_id',],
+            },
+          ],
+        },
+        {
+          model: Specializations,
+          as: 'specializations',
+          attributes: ['name'],
+        }
+      ],
+    });
+
+    return res.status(200).json(users);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: err.message });
+  }
+});
+
 router.get("/:id", auth, isAdmin, async (req, res) => {
   const targetUserId = req.params.id;
 
