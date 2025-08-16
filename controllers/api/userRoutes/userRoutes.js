@@ -7,39 +7,98 @@ const { Op } = require("sequelize");
 const ROLES = require("../../../utils/roles")
 
 router.get("/", auth, isAdmin, async (req, res) => {
-  const { countryId, cityId, organizationId, roleId } = req.query;
-
+  const { countryId, cityId, organizationId, roleId, sortBy, sortOrder = 'ASC', rowsPerPage = 10, pageNumber = 1 } = req.query;
+  console.log("Received query parameters:", req.query); // Debugging
+  const allowedSortFields = [
+    "actions",
+    "first_name",
+    "last_name",
+    "email",
+    "CME_Credits",
+    "remainingCredits",
+    "specializations",
+    "role",
+    "country",
+    "city",
+    "organization"
+  ]
+  console.log("Query parameters:", req.query); // Debugging
   try {
-    const where = buildUserQueryFilters(req, { countryId, cityId, organizationId, roleId });
+    const where = buildUserQueryFilters(req, { countryId, cityId, organizationId, roleId, sortBy, sortOrder, rowsPerPage, pageNumber });
+
+    const order = [];
+    if (sortBy) {
+
+      const safeSortBy = allowedSortFields.includes(sortBy)
+        ? sortBy
+        : 'last_name'; // Default to last_name if sortBy is not allowed
+
+      const safeSortOrder = sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+      switch (safeSortBy) {
+        case 'organization':
+          order.push([{ model: Organizations, as: 'organization' }, 'name', safeSortOrder]);
+          break;
+
+        case 'role':
+          order.push([{ model: Roles, as: 'role' }, 'name', safeSortOrder]);
+          break;
+
+        case 'country':
+          order.push([{ model: Countries, as: 'country' }, 'name', safeSortOrder]);
+          break;
+
+        case 'city':
+          order.push([{ model: Cities, as: 'city' }, 'name', safeSortOrder]);
+          break;
+
+        case 'specializations':
+          // Always ASC for alphabetic sorting of first specialization
+          order.push([{ model: Specializations, as: 'specializations' }, 'name', 'ASC']);
+          break;
+
+        default:
+          // Sorting by field on Users table
+          order.push([safeSortBy, safeSortOrder]);
+      }
+    }
+
+    const limit = parseInt(rowsPerPage, 10) || 10;
+    const offset = ((parseInt(pageNumber, 10) || 1) - 1) * limit;
+
+
 
     const users = await Users.findAll({
       where,
       attributes: ["id", "first_name", "last_name", "email",],
       include: [
-        { model: Organizations,
+        {
+          model: Organizations,
           as: "organization",
           attributes: ["name", "id"],
         },
-        { model: Roles, 
-          as: "role", 
-          attributes: ["name", "id"], 
+        {
+          model: Roles,
+          as: "role",
+          attributes: ["name", "id"],
         },
-        { model: Countries, 
-          as: "country", 
-          attributes: ["name", "id"], 
+        {
+          model: Countries,
+          as: "country",
+          attributes: ["name", "id"],
         },
-        { model: Cities,
+        {
+          model: Cities,
           as: "city",
           attributes: ["name", "id"],
         },
-        { 
-          model: QuizScores, 
-          as: 'quizScores', 
+        {
+          model: QuizScores,
+          as: 'quizScores',
           attributes: ['score', 'date_taken'],
           include: [
             {
-              model: Modules, 
-              as: 'module', 
+              model: Modules,
+              as: 'module',
               attributes: ['name', 'module_id',],
             },
           ],
@@ -50,6 +109,9 @@ router.get("/", auth, isAdmin, async (req, res) => {
           attributes: ['name', 'id'],
         }
       ],
+      order: order.length > 0 ? order : [['last_name', 'ASC']], // Default sort by last_name if no sortBy provided
+      limit,
+      offset,
     });
 
     return res.status(200).json(users);
@@ -64,16 +126,16 @@ router.get('/me', auth, async (req, res) => {
   try {
     // Fetch the authenticated user's details
     const user = await Users.findByPk(req.user.id, {
-      attributes: ['id', 'first_name', 'last_name', 'email', 'createdAt'], 
+      attributes: ['id', 'first_name', 'last_name', 'email', 'createdAt'],
       include: [
-        { 
-          model: QuizScores, 
-          as: 'quizScores', 
+        {
+          model: QuizScores,
+          as: 'quizScores',
           attributes: ['score', 'date_taken'],
           include: [
             {
-              model: Modules, 
-              as: 'module', 
+              model: Modules,
+              as: 'module',
               attributes: ['id', 'name', 'module_id',],
             },
           ],
@@ -122,30 +184,34 @@ router.get("/search", auth, isAdmin, async (req, res) => {
       where, // Use the correct `where` object
       attributes: ["id", "first_name", "last_name", "email",],
       include: [
-        { model: Organizations,
+        {
+          model: Organizations,
           as: "organization",
           attributes: ["name", "id"],
         },
-        { model: Roles, 
-          as: "role", 
-          attributes: ["name", "id"], 
+        {
+          model: Roles,
+          as: "role",
+          attributes: ["name", "id"],
         },
-        { model: Countries, 
-          as: "country", 
-          attributes: ["name", "id"], 
+        {
+          model: Countries,
+          as: "country",
+          attributes: ["name", "id"],
         },
-        { model: Cities,
+        {
+          model: Cities,
           as: "city",
           attributes: ["name"],
         },
-        { 
-          model: QuizScores, 
-          as: 'quizScores', 
+        {
+          model: QuizScores,
+          as: 'quizScores',
           attributes: ['score', 'date_taken'],
           include: [
             {
-              model: Modules, 
-              as: 'module', 
+              model: Modules,
+              as: 'module',
               attributes: ['name', 'module_id',],
             },
           ],
@@ -167,7 +233,7 @@ router.get("/search", auth, isAdmin, async (req, res) => {
 
 //search users by first name, last name, or email with one broad search query
 router.get("/search/broad", auth, isAdmin, async (req, res) => {
-  const { query } = req.query; // The search query
+  const { query, rowsPerPage = 10, pageNumber = 1, sortBy, sortOrder } = req.query; // The search query
 
   try {
     const where = buildUserQueryFilters(req);
@@ -180,34 +246,88 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
       ];
     }
 
+    const limit = parseInt(rowsPerPage, 10) || 10;
+    const page = parseInt(pageNumber, 10) || 1;
+    const offset = (page - 1) * limit;
+
+    const order = [];
+    if (sortBy) {
+      const allowedSortFields = [
+        "first_name",
+        "last_name",
+        "email",
+        "CME_Credits",
+        "remainingCredits",
+        "specializations",
+        "role",
+        "country",
+        "city",
+        "organization"
+      ];
+      const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'last_name'; // Default to last_name if sortBy is not allowed
+      const safeSortOrder = sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+      switch (safeSortBy) {
+        case 'organization':
+          order.push([{ model: Organizations, as: 'organization' }, 'name', safeSortOrder]);
+          break;      
+        case 'role':
+          order.push([{ model: Roles, as: 'role' }, 'name', safeSortOrder]);
+          break;
+        case 'country':
+          order.push([{ model: Countries, as: 'country' }, 'name', safeSortOrder]);
+          break;
+        case 'city':
+          order.push([{ model: Cities, as: 'city' }, 'name', safeSortOrder]);
+          break;
+        case 'specializations':
+          // Always ASC for alphabetic sorting of first specialization
+          order.push([{ model: Specializations, as: 'specializations' }, 'name', 'ASC']);
+          break;
+        default:
+          // Sorting by field on Users table
+          order.push([safeSortBy, safeSortOrder]);
+      }
+    } else {
+      order.push(['last_name', 'ASC']); // Default sort by last_name if no sortBy provided
+    }
+    
+
+    // Count total users matching filters
+    const totalUsers = await Users.count({ where });
+    const pageCount = Math.ceil(totalUsers / limit);
+
     const users = await Users.findAll({
       where,
       attributes: ["id", "first_name", "last_name", "email",],
       include: [
-        { model: Organizations,
+        {
+          model: Organizations,
           as: "organization",
           attributes: ["name", "id"],
         },
-        { model: Roles, 
-          as: "role", 
-          attributes: ["name", "id"], 
+        {
+          model: Roles,
+          as: "role",
+          attributes: ["name", "id"],
         },
-        { model: Countries, 
-          as: "country", 
-          attributes: ["name", "id"], 
+        {
+          model: Countries,
+          as: "country",
+          attributes: ["name", "id"],
         },
-        { model: Cities,
+        {
+          model: Cities,
           as: "city",
           attributes: ["name"],
         },
-        { 
-          model: QuizScores, 
-          as: 'quizScores', 
+        {
+          model: QuizScores,
+          as: 'quizScores',
           attributes: ['score', 'date_taken'],
           include: [
             {
-              model: Modules, 
-              as: 'module', 
+              model: Modules,
+              as: 'module',
               attributes: ['name', 'module_id',],
             },
           ],
@@ -218,9 +338,12 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
           attributes: ['name'],
         }
       ],
+      order,
+      limit,
+      offset,
     });
 
-    return res.status(200).json(users);
+    return res.status(200).json({ users, totalUsers, page, rowsPerPage: limit, pageCount });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: err.message });
@@ -241,30 +364,34 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
         "email",
       ],
       include: [
-        { model: Organizations,
+        {
+          model: Organizations,
           as: "organization",
           attributes: ["name"],
         },
-        { model: Roles, 
-          as: "role", 
-          attributes: ["name"], 
+        {
+          model: Roles,
+          as: "role",
+          attributes: ["name"],
         },
-        { model: Countries, 
-          as: "country", 
-          attributes: ["name"], 
+        {
+          model: Countries,
+          as: "country",
+          attributes: ["name"],
         },
-        { model: Cities,
+        {
+          model: Cities,
           as: "city",
           attributes: ["name"],
         },
-        { 
-          model: QuizScores, 
-          as: 'quizScores', 
+        {
+          model: QuizScores,
+          as: 'quizScores',
           attributes: ['score', 'date_taken'],
           include: [
             {
-              model: Modules, 
-              as: 'module', 
+              model: Modules,
+              as: 'module',
               attributes: ['name', 'module_id',],
             },
           ],
@@ -379,7 +506,7 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
     const disallowedFields = ["country_id", "city_id", "organization_id"];
     // Prevent Admins from modifying sensitive fields
     if (userRoleId !== ROLES.SUPER_ADMIN) {
-      
+
       const invalidFields = Object.keys(updatedData).filter(key => disallowedFields.includes(key));
 
       if (invalidFields.length > 0) {
@@ -492,8 +619,8 @@ router.delete("/:id", auth, isAdmin, async (req, res) => {
   const userOrganizationId = req.user.organization_id; // Authenticated user's organization ID
 
   const { id: targetUserId } = req.params; // Target user ID to delete
-  
-  if(targetUserId === userId){
+
+  if (targetUserId === userId) {
     return res.status(403).json({
       message: "You cannot delete your own user account",
     });
@@ -509,16 +636,16 @@ router.delete("/:id", auth, isAdmin, async (req, res) => {
     }
 
     // Role-based deletion rules
-    if(userRoleId === ROLES.ADMIN){
+    if (userRoleId === ROLES.ADMIN) {
       // Admins can only delete users within the same organization
-      if(targetUser.organization_id !== userOrganizationId){
+      if (targetUser.organization_id !== userOrganizationId) {
         return res.status(403).json({
           message: "You do not have permission to delete a user outside of your organization",
         });
       }
     }
     // admin cannot delete another admin or a super admin
-    if(userRoleId === ROLES.ADMIN && (targetUserIsAdmin || targetUserIsSuperAdmin)){
+    if (userRoleId === ROLES.ADMIN && (targetUserIsAdmin || targetUserIsSuperAdmin)) {
       return res.status(403).json({
         message: "You do not have permission to delete another admin",
       });
