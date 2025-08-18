@@ -6,9 +6,12 @@ const { buildUserQueryFilters } = require("../../../middleware/accessControl");
 const { Op } = require("sequelize");
 const ROLES = require("../../../utils/roles")
 
+const sortAscend = 'ASC';
+const sortDescend = 'DESC';
+
+//this route is actually no longer beings used by the admin dashboard, but I am leaving it here in case it is being used elsewhere
 router.get("/", auth, isAdmin, async (req, res) => {
-  const { countryId, cityId, organizationId, roleId, sortBy, sortOrder = 'ASC', rowsPerPage = 10, pageNumber = 1 } = req.query;
-  console.log("Received query parameters:", req.query); // Debugging
+  const { countryId, cityId, organizationId, roleId, sortBy, sortOrder = sortAscend, rowsPerPage = 10, pageNumber = 1 } = req.query;
   const allowedSortFields = [
     "actions",
     "first_name",
@@ -22,7 +25,7 @@ router.get("/", auth, isAdmin, async (req, res) => {
     "city",
     "organization"
   ]
-  console.log("Query parameters:", req.query); // Debugging
+  
   try {
     const where = buildUserQueryFilters(req, { countryId, cityId, organizationId, roleId, sortBy, sortOrder, rowsPerPage, pageNumber });
 
@@ -33,7 +36,7 @@ router.get("/", auth, isAdmin, async (req, res) => {
         ? sortBy
         : 'last_name'; // Default to last_name if sortBy is not allowed
 
-      const safeSortOrder = sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+      const safeSortOrder = sortOrder?.toUpperCase() === sortAscend ? sortAscend : sortDescend;
       switch (safeSortBy) {
         case 'organization':
           order.push([{ model: Organizations, as: 'organization' }, 'name', safeSortOrder]);
@@ -53,7 +56,7 @@ router.get("/", auth, isAdmin, async (req, res) => {
 
         case 'specializations':
           // Always ASC for alphabetic sorting of first specialization
-          order.push([{ model: Specializations, as: 'specializations' }, 'name', 'ASC']);
+          order.push([{ model: Specializations, as: 'specializations' }, 'name', sortAscend]);
           break;
 
         default:
@@ -109,7 +112,7 @@ router.get("/", auth, isAdmin, async (req, res) => {
           attributes: ['name', 'id'],
         }
       ],
-      order: order.length > 0 ? order : [['last_name', 'ASC']], // Default sort by last_name if no sortBy provided
+      order: order.length > 0 ? order : [['last_name', sortAscend]], // Default sort by last_name if no sortBy provided
       limit,
       offset,
     });
@@ -265,7 +268,7 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
         "organization"
       ];
       const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'last_name'; // Default to last_name if sortBy is not allowed
-      const safeSortOrder = sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+      const safeSortOrder = sortOrder?.toUpperCase() === sortAscend ? sortAscend : sortDescend;
       switch (safeSortBy) {
         case 'organization':
           order.push([{ model: Organizations, as: 'organization' }, 'name', safeSortOrder]);
@@ -281,14 +284,14 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
           break;
         case 'specializations':
           // Always ASC for alphabetic sorting of first specialization
-          order.push([{ model: Specializations, as: 'specializations' }, 'name', 'ASC']);
+          order.push([{ model: Specializations, as: 'specializations' }, 'name', sortAscend]);
           break;
         default:
           // Sorting by field on Users table
           order.push([safeSortBy, safeSortOrder]);
       }
     } else {
-      order.push(['last_name', 'ASC']); // Default sort by last_name if no sortBy provided
+      order.push(['last_name', sortAscend]); // Default sort by last_name if no sortBy provided
     }
     
 
@@ -591,7 +594,6 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
 
 router.delete('/delete-account', auth, async (req, res) => {
   try {
-    console.log("User making delete request:", req.user); // Debugging
 
     if (!req.user || !req.user.id) {
       return res.status(400).json({ message: 'User not found' });
