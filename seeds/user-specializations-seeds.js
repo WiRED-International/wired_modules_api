@@ -42,6 +42,8 @@ const sequelize = require('../config/connection');
 
 const seedUserSpecializations = async () => {
   try {
+    await sequelize.getQueryInterface().bulkDelete('user_specializations', null, {});
+
     await sequelize.authenticate();
     console.log('📦 Seeding user_specializations...');
 

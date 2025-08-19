@@ -9,6 +9,8 @@ const specializations = [
 
 const specializationsSeed = async () => {
   try {
+    // Clear existing specializations
+    await Specializations.destroy({ where: {}});
     await Specializations.bulkCreate(specializations);
     console.log('Specializations seeded successfully!');
   } catch (err) {
