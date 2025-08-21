@@ -307,6 +307,7 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
           model: Organizations,
           as: "organization",
           attributes: ["name", "id"],
+          required: false, 
         },
         {
           model: Roles,
@@ -317,11 +318,13 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
           model: Countries,
           as: "country",
           attributes: ["name", "id"],
+          required: false,
         },
         {
           model: Cities,
           as: "city",
           attributes: ["name"],
+          required: false,
         },
         {
           model: QuizScores,
@@ -334,16 +337,20 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
               attributes: ['name', 'module_id',],
             },
           ],
+          required: false,
         },
         {
           model: Specializations,
           as: 'specializations',
           attributes: ['name'],
+          required: false, // Allow users without specializations to still be returned
         }
       ],
       order,
       limit,
       offset,
+      subQuery: false, // Prevents subquery for pagination
+      logging: console.log, // Log the query for debugging
     });
 
     return res.status(200).json({ users, totalUsers, page, rowsPerPage: limit, pageCount });
