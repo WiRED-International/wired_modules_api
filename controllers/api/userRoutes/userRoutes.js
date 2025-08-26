@@ -301,13 +301,13 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
 
     const users = await Users.findAll({
       where,
-      attributes: ["id", "first_name", "last_name", "email",],
+      attributes: ["id", "first_name", "last_name", "email"],
       include: [
         {
           model: Organizations,
           as: "organization",
           attributes: ["name", "id"],
-          required: false, 
+          required: false,
         },
         {
           model: Roles,
@@ -328,29 +328,30 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
         },
         {
           model: QuizScores,
-          as: 'quizScores',
-          attributes: ['score', 'date_taken'],
+          as: "quizScores",
+          attributes: ["score", "date_taken"],
           include: [
             {
               model: Modules,
-              as: 'module',
-              attributes: ['name', 'module_id',],
+              as: "module",
+              attributes: ["name", "module_id"],
             },
           ],
           required: false,
         },
-        {
-          model: Specializations,
-          as: 'specializations',
-          attributes: ['name'],
-          required: false, // Allow users without specializations to still be returned
-        }
+        //It was decided that specializations should not be included in broad search results because it was causing difficulties with pagination and sorting.  If need be, a raw query could be used to solve this problem, but it is not worth the effort at this time. Perhaps an entirely separate endpoint could be created for sorting users by specialization if that is a needed feature in the future. applying the MAX function on (`Users`.`first_name`, (`Users`.`last_name`) and `Users`.`email`) along with calling GROUP_CONCAT on (`specializations`.`name`) would be one way to do it
+        // {
+        //   model: Specializations,
+        //   as: 'specializations',
+        //   attributes: ['name'],
+        //   required: false, // Allow users without specializations to still be returned
+        // }
       ],
+
       order,
       limit,
       offset,
-      subQuery: false, // Prevents subquery for pagination
-      logging: console.log, // Log the query for debugging
+      subQuery: false,
     });
 
     return res.status(200).json({ users, totalUsers, page, rowsPerPage: limit, pageCount });
