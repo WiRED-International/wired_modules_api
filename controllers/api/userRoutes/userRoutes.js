@@ -236,7 +236,7 @@ router.get("/search", auth, isAdmin, async (req, res) => {
 
 //search users by first name, last name, or email with one broad search query
 router.get("/search/broad", auth, isAdmin, async (req, res) => {
-  const { query, rowsPerPage = 10, pageNumber = 1, sortBy, sortOrder } = req.query; // The search query
+  const { query, rowsPerPage = 10, pageNumber = 1, sortBy, sortOrder, organizationId, countryId, cityId, roleId } = req.query; // The search query
 
   try {
     const where = buildUserQueryFilters(req);
@@ -249,50 +249,69 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
       ];
     }
 
+    if (countryId && !isNaN(parseInt(countryId))) {
+      where.country_id = parseInt(countryId);
+    }
+    if (cityId && !isNaN(parseInt(cityId))) {
+      where.city_id = parseInt(cityId);
+    }
+
+    if (organizationId && !isNaN(parseInt(organizationId))) {
+      where.organization_id = parseInt(organizationId);
+    }
+
+    if (roleId && !isNaN(parseInt(roleId))) {
+      where.role_id = parseInt(roleId);
+    }
+
     const limit = parseInt(rowsPerPage, 10) || 10;
     const page = parseInt(pageNumber, 10) || 1;
     const offset = (page - 1) * limit;
 
-    const order = [];
-    if (sortBy) {
-      const allowedSortFields = [
-        "first_name",
-        "last_name",
-        "email",
-        "CME_Credits",
-        "remainingCredits",
-        "specializations",
-        "role",
-        "country",
-        "city",
-        "organization"
-      ];
-      const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'last_name'; // Default to last_name if sortBy is not allowed
-      const safeSortOrder = sortOrder?.toUpperCase() === sortAscend ? sortAscend : sortDescend;
-      switch (safeSortBy) {
-        case 'organization':
-          order.push([{ model: Organizations, as: 'organization' }, 'name', safeSortOrder]);
-          break;      
-        case 'role':
-          order.push([{ model: Roles, as: 'role' }, 'name', safeSortOrder]);
-          break;
-        case 'country':
-          order.push([{ model: Countries, as: 'country' }, 'name', safeSortOrder]);
-          break;
-        case 'city':
-          order.push([{ model: Cities, as: 'city' }, 'name', safeSortOrder]);
-          break;
-        case 'specializations':
-          // Always ASC for alphabetic sorting of first specialization
-          order.push([{ model: Specializations, as: 'specializations' }, 'name', sortAscend]);
-          break;
-        default:
-          // Sorting by field on Users table
-          order.push([safeSortBy, safeSortOrder]);
-      }
-    } else {
-      order.push(['last_name', sortAscend]); // Default sort by last_name if no sortBy provided
-    }
+    //due to the complexity of sorting by associated models, we will do the sorting in JavaScript after fetching the data
+    // this is not ideal for large datasets, but it is acceptable for small to moderate datasets. if the dataset grows too large, we may need to implement a more complex solution using raw SQL queries or a different ORM that supports more advanced sorting capabilities.
+    // another option would be to create separate endpoints for each type of sorting that requires associated models, but that would lead to a proliferation of endpoints and is not a great solution either.
+
+    // const order = [];
+    // if (sortBy) {
+    //   const allowedSortFields = [
+    //     "first_name",
+    //     "last_name",
+    //     "email",
+    //     "CME_Credits",
+    //     "remainingCredits",
+    //     "specializations",
+    //     "role",
+    //     "country",
+    //     "city",
+    //     "organization"
+    //   ];
+    //   const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'last_name'; // Default to last_name if sortBy is not allowed
+    //   const safeSortOrder = sortOrder?.toUpperCase() === sortAscend ? sortAscend : sortDescend;
+    //   switch (safeSortBy) {
+    //     case 'organization':
+    //       order.push([{ model: Organizations, as: 'organization' }, 'name', safeSortOrder]);
+    //       break;      
+    //     case 'role':
+    //       order.push([{ model: Roles, as: 'role' }, 'name', safeSortOrder]);
+    //       break;
+    //     case 'country':
+    //       order.push([{ model: Countries, as: 'country' }, 'name', safeSortOrder]);
+    //       break;
+    //     case 'city':
+    //       order.push([{ model: Cities, as: 'city' }, 'name', safeSortOrder]);
+    //       break;
+    //     case 'specializations':
+    //       // Always ASC for alphabetic sorting of first specialization
+    //       order.push([{ model: Specializations, as: 'specializations' }, 'name', sortAscend]);
+    //       break;
+    //     default:
+    //       // Sorting by field on Users table
+    //       order.push([safeSortBy, safeSortOrder]);
+    //   }
+    // } else {
+    //   order.push(['last_name', sortAscend]); // Default sort by last_name if no sortBy provided
+    // }
     
 
     // Count total users matching filters
@@ -301,12 +320,13 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
 
     const users = await Users.findAll({
       where,
-      attributes: ["id", "first_name", "last_name", "email",],
+      attributes: ["id", "first_name", "last_name", "email"],
       include: [
         {
           model: Organizations,
           as: "organization",
           attributes: ["name", "id"],
+          required: false,
         },
         {
           model: Roles,
@@ -317,36 +337,92 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
           model: Countries,
           as: "country",
           attributes: ["name", "id"],
+          required: false,
         },
         {
           model: Cities,
           as: "city",
           attributes: ["name"],
+          required: false,
         },
         {
           model: QuizScores,
-          as: 'quizScores',
-          attributes: ['score', 'date_taken'],
+          as: "quizScores",
+          attributes: ["score", "date_taken"],
           include: [
             {
               model: Modules,
-              as: 'module',
-              attributes: ['name', 'module_id',],
+              as: "module",
+              attributes: ["name", "module_id"],
             },
           ],
+          required: false,
         },
         {
           model: Specializations,
           as: 'specializations',
           attributes: ['name'],
+          required: false, // Allow users without specializations to still be returned
+          group: ['users.id'],
         }
       ],
-      order,
-      limit,
-      offset,
-    });
 
-    return res.status(200).json({ users, totalUsers, page, rowsPerPage: limit, pageCount });
+      //sorting and pagination will be handled in JavaScript after fetching the data
+
+      // order,
+      // limit,
+      // offset,
+      // distinct: true,
+      // subQuery: false,
+    });
+    if(sortBy === 'last_name' || !sortBy) {
+      users.sort((a, b) => {
+        const nameA = a.last_name.toUpperCase(); // ignore upper and lowercase
+        const nameB = b.last_name.toUpperCase(); // ignore upper and lowercase
+        if (nameA < nameB) return sortOrder === sortAscend ? -1 : 1;
+        if (nameA > nameB) return sortOrder === sortAscend ? 1 : -1;
+        return 0;
+      });
+    } else if (sortBy === 'first_name') {
+      users.sort((a, b) => {
+        const nameA = a.first_name.toUpperCase(); // ignore upper and lowercase
+        const nameB = b.first_name.toUpperCase(); // ignore upper and lowercase
+        if (nameA < nameB) return sortOrder === sortAscend ? -1 : 1;
+        if (nameA > nameB) return sortOrder === sortAscend ? 1 : -1;
+        return 0;
+      });
+    } else if (sortBy === 'email') {
+      users.sort((a, b) => {
+        const nameA = a.email.toUpperCase(); // ignore upper and lowercase
+        const nameB = b.email.toUpperCase(); // ignore upper and lowercase
+        if (nameA < nameB) return sortOrder === sortAscend ? -1 : 1;
+        if (nameA > nameB) return sortOrder === sortAscend ? 1 : -1;
+        return 0;
+      });
+    } else if (sortBy === 'organization') {
+      users.sort((a, b) => {
+        const orgA = a.organization ? a.organization.name : '';
+        const orgB = b.organization ? b.organization.name : '';
+        if (orgA < orgB) return sortOrder === sortAscend ? -1 : 1;
+        if (orgA > orgB) return sortOrder === sortAscend ? 1 : -1;
+        return 0;
+      });
+    } else if (sortBy === 'role') {
+      users.sort((a, b) => {
+        const roleA = a.role ? a.role.name : '';
+        const roleB = b.role ? b.role.name : '';
+        if (roleA < roleB) return sortOrder === sortAscend ? -1 : 1;
+        if (roleA > roleB) return sortOrder === sortAscend ? 1 : -1;
+        return 0;
+      });
+    }
+
+    //pagination
+    const start = offset;
+    const end = offset + limit;
+    const paginatedUsers = users.slice(start, end);
+
+    return res.status(200).json({ users: paginatedUsers, totalUsers, page, rowsPerPage: limit, pageCount });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: err.message });
