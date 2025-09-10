@@ -667,6 +667,23 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 });
+// update a user's specializations
+router.put("/:id/specializations", async (req, res) => {
+  try {
+    const { specializationIds } = req.body; // array of specialization IDs
+    const user = await Users.findByPk(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // replace existing with new set
+    await user.setSpecializations(specializationIds);
+
+    const updated = await user.getSpecializations();
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 router.delete('/delete-account', auth, async (req, res) => {
   try {
