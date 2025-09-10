@@ -451,17 +451,17 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
         {
           model: Roles,
           as: "role",
-          attributes: ["name"],
+          attributes: ["name", "id"],
         },
         {
           model: Countries,
           as: "country",
-          attributes: ["name"],
+          attributes: ["name", "id"],
         },
         {
           model: Cities,
           as: "city",
-          attributes: ["name"],
+          attributes: ["name", "id"],
         },
         {
           model: QuizScores,
@@ -478,7 +478,7 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
         {
           model: Specializations,
           as: 'specializations',
-          attributes: ['name'],
+          attributes: ['name', 'id'],
         }
       ],
     });
