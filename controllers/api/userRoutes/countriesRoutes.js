@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
             },
           }
         : {}, // no filter, return all if no search query
-      attributes: ['id', 'name'],
+      attributes: ['id', 'name', 'code'],
     });
 
     res.status(200).json(countries);

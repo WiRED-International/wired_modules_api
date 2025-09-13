@@ -451,17 +451,17 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
         {
           model: Roles,
           as: "role",
-          attributes: ["name"],
+          attributes: ["name", "id"],
         },
         {
           model: Countries,
           as: "country",
-          attributes: ["name"],
+          attributes: ["name", "id"],
         },
         {
           model: Cities,
           as: "city",
-          attributes: ["name"],
+          attributes: ["name", "id"],
         },
         {
           model: QuizScores,
@@ -478,7 +478,7 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
         {
           model: Specializations,
           as: 'specializations',
-          attributes: ['name'],
+          attributes: ['name', 'id'],
         }
       ],
     });
@@ -603,6 +603,18 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
       updatedData.role_id = parsedRoleId;
     }
 
+    //update specializations if provided
+    // this is done separately because specializations is a many-to-many relationship and cannot be updated like a normal field
+    if (userRoleId === ROLES.SUPER_ADMIN && updatedData.specialization_ids !== undefined) {
+      if (!Array.isArray(updatedData.specialization_ids)) {
+        return res.status(400).json({ message: "Specializations must be an array of specialization IDs" });
+      }
+      // set the specializations
+      await targetUser.setSpecializations(updatedData.specialization_ids);
+      // remove specializations from updatedData to prevent trying to update a non-existent field
+      delete updatedData.specialization_ids;
+    }
+
     // First: Validate allowed update fields
     const allowedUpdates = [
       "first_name",
@@ -656,6 +668,33 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
     // Fetch the updated user with excluded sensitive fields
     const updatedUser = await Users.findByPk(targetUserId, {
       attributes: { exclude: ["password"] }, // Exclude sensitive fields
+      include: [
+        {
+          model: Organizations,
+          as: "organization",
+          attributes: ["name"],
+        },
+        {
+          model: Roles,
+          as: "role",
+          attributes: ["name", "id"],
+        },
+        {
+          model: Countries,
+          as: "country",
+          attributes: ["name", "id"],
+        },
+        {
+          model: Cities,
+          as: "city",
+          attributes: ["name", "id"],
+        },
+        {
+          model: Specializations,
+          as: 'specializations',
+          attributes: ['name', 'id'],
+        }
+      ],
     });
 
     return res.status(200).json({
@@ -667,6 +706,8 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 });
+
+
 
 router.delete('/delete-account', auth, async (req, res) => {
   try {
