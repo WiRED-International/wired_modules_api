@@ -1,9 +1,9 @@
 const { Model, DataTypes } = require('sequelize');
 const sequelize = require('../../config/connection');
 
-class Exam extends Model {}
+class Exams extends Model {}
 
-Exam.init(
+Exams.init(
   {
     id: {
       type: DataTypes.INTEGER,
@@ -15,7 +15,8 @@ Exam.init(
       allowNull: false
     },
     description: {
-      type: DataTypes.TEXT
+      type: DataTypes.TEXT,
+      allowNull: true
     },
     available_from: {
       type: DataTypes.DATE,
@@ -29,19 +30,15 @@ Exam.init(
       type: DataTypes.INTEGER,
       allowNull: false
     },
-    created_at: {
-      type: DataTypes.DATE,
-      allowNull: false
-    }
   },
   {
     sequelize,
-    modelName: 'Exam',
-    tableName: 'exam',
+    modelName: 'Exams',
+    tableName: 'exams',
     timestamps: true,
     freezeTableName: true,
     underscored: true
   }
 );
 
-module.exports = Exam;
+module.exports = Exams;

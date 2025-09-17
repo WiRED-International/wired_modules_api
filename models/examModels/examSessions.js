@@ -1,9 +1,9 @@
 const { Model, DataTypes } = require('sequelize');
 const sequelize = require('../../config/connection');
 
-class ExamSession extends Model {};
+class ExamSessions extends Model {};
 
-ExamSession.init(
+ExamSessions.init(
     {
         id: {
             type: DataTypes.INTEGER,
@@ -40,19 +40,15 @@ ExamSession.init(
         score: {
             type: DataTypes.FLOAT
         },
-        created_at: {
-            type: DataTypes.DATE,
-            allowNull: false
-        },
     }, 
     {
         sequelize,
-        modelName: 'ExamSession',
-        tableName: 'exam_session',
+        modelName: 'ExamSessions',
+        tableName: 'exam_sessions',
         timestamps: true,
         freezeTableName: true,
         underscored: true,
     }
 );
 
-module.exports = ExamSession;
+module.exports = ExamSessions;

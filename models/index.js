@@ -14,9 +14,9 @@ const Downloads = require('./moduleModels/downloads');
 const Packages = require('./moduleModels/packages');
 const Specializations = require('./userModels/specializations');
 
-const Exam = require('./examModels/exam');
+const Exams = require('./examModels/exams');
 const ExamQuestions = require('./examModels/examQuestions');
-const ExamSession = require('./examModels/examSession');
+const ExamSessions = require('./examModels/examSessions');
 
 // User-related associations
 Users.hasMany(QuizScores, { as: 'quizScores', foreignKey: 'user_id' });
@@ -37,15 +37,15 @@ Roles.hasMany(Users, { as: 'users', foreignKey: 'role_id' });
 Users.belongsToMany(Specializations, { as: 'specializations', through: 'user_specializations', foreignKey: 'user_id' });
 Specializations.belongsToMany(Users, { as: 'users', through: 'user_specializations', foreignKey: 'specialization_id' });
 
-Users.hasMany(ExamSession, { as: 'exam_session', foreignKey: 'user_id' });
-ExamSession.belongsTo(Users, { as: 'user', foreignKey: 'user_id' });
+Users.hasMany(ExamSessions, { as: 'exam_sessions', foreignKey: 'user_id' });
+ExamSessions.belongsTo(Users, { as: 'users', foreignKey: 'user_id' });
 
 // Exam-related associations
-Exam.hasMany(ExamQuestions, {  as: 'exam_questions', foreignKey: 'exam_id' });
-ExamQuestions.belongsTo(Exam, { as: 'exam', foreignKey: 'exam_id' });
+Exams.hasMany(ExamQuestions, {  as: 'exam_questions', foreignKey: 'exam_id' });
+ExamQuestions.belongsTo(Exams, { as: 'exams', foreignKey: 'exam_id' });
 
-Exam.hasMany(ExamSession, { as: 'exam_session', foreignKey: 'exam_id' });
-ExamSession.belongsTo(Exam, { as: 'exam', foreignKey: 'exam_id' });
+Exams.hasMany(ExamSessions, { as: 'exam_session', foreignKey: 'exam_id' });
+ExamSessions.belongsTo(Exams, { as: 'exams', foreignKey: 'exam_id' });
 
 // Module-related associations
 Modules.belongsTo(Modules, { as: 'RedirectedModule', foreignKey: 'redirect_module_id' });
@@ -110,7 +110,7 @@ module.exports = {
   Downloads,
   Packages,
   Specializations,
-  Exam,
+  Exams,
   ExamQuestions,
   ExamSessions,
 };
