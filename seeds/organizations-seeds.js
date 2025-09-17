@@ -18,7 +18,7 @@ const organizations = [
   },
   {
     name: 'Maseno University',
-    country_id: 1,
+    country_id: 2,
     city_id: 4,
   },
 ];

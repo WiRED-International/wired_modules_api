@@ -51,6 +51,8 @@ const quizScores = [
 
 const quizScoresSeed = async () => {
   try {
+    // Clear existing quiz scores
+    await QuizScores.destroy({ where: {}, truncate: true });
     await QuizScores.bulkCreate(quizScores);
     console.log('QuizScores seeded successfully!');
   } catch (err) {

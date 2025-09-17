@@ -44,10 +44,12 @@ router.use('/quiz-scores', quizScoreRoutes);
 router.use('/api/downloads', downloadsroutes);
 router.use('/leaderboard', leaderboard);
 router.use('/api/googleAPIKey', googleAPIKeyRoute);
-router.use('/specializations', specializationsRoutes);
+router.use('/api/specializations', specializationsRoutes);
 router.use('/email', emailRoutes);
 router.use('/exam-sessions', examSessionsRoutes);
 router.use('/exams', examRoutes);
+
+
 
 
 module.exports = router;

@@ -5,15 +5,19 @@ const { Op } = require('sequelize');
 
 router.get('/', async (req, res) => {
   const { query } = req.query;
+
   try {
     const countries = await Countries.findAll({
-      where: {
-        name: {
-          [Op.like]: `${query}%`,
-        },
-      },
-      attributes: ['id', 'name'],
+      where: query
+        ? {
+            name: {
+              [Op.like]: `${query}%`,
+            },
+          }
+        : {}, // no filter, return all if no search query
+      attributes: ['id', 'name', 'code'],
     });
+
     res.status(200).json(countries);
   } catch (err) {
     res.status(500).json({ message: err.message });
