@@ -776,7 +776,7 @@ router.delete("/:id", auth, isAdmin, async (req, res) => {
     await targetUser.destroy();
 
     res.status(200).json({
-      message: `User with ID ${targetUserId} deleted successfully`,
+      message: `User ${targetUser.first_name} ${targetUser.last_name} has been deleted successfully`,
     });
   } catch (err) {
     console.log(err);
