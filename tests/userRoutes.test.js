@@ -15,12 +15,15 @@ const adminToken = jwt.sign({ id: 2, roleId: ADMIN_ROLE_ID, organization_id: 1, 
 const superAdminToken = jwt.sign({ id: 3, roleId: SUPER_ADMIN_ROLE_ID }, SECRET);
 
 // Mock User Model
-jest.mock('../models', () => ({
-  Users: {
-    findByPk: jest.fn(),
-    findOne: jest.fn(),
-  },
-}));
+jest.mock('../models', () => {
+  return {
+    Users: {
+      findByPk: jest.fn(),
+      findOne: jest.fn(),
+      findAll: jest.fn(),
+    },
+  };
+});
 
 describe('User Update Routes', () => {
   afterEach(() => {
@@ -182,6 +185,26 @@ describe('User Update Routes', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.message).toBe("User updated successfully");
   });
+
+test('Admin can only view users in their assigned country and organization', async () => {
+  const mockUsers = [
+    { id: 1, role_id: 1, country_id: 1, organization_id: 1 },
+  ];
+
+  Users.findAll.mockResolvedValue(mockUsers);
+
+  const res = await request(app)
+    .get('/users')
+    .set('Authorization', `Bearer ${adminToken}`);
+
+  console.log('[RESPONSE BODY]', res.body); 
+
+  expect(res.statusCode).toBe(200);
+  expect(Array.isArray(res.body)).toBe(true);
+  expect(res.body.length).toBe(1);
+  expect(res.body[0].country_id).toBe(1);
+  expect(res.body[0].organization_id).toBe(1);
+});
 
 });
 

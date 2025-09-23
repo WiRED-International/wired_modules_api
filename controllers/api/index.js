@@ -19,7 +19,9 @@ const downloadsroutes = require('./moduleRoutes/downloadsRoutes')
 const leaderboard = require('./moduleRoutes/leaderboard');
 const googleAPIKeyRoute = require('./googleAPIKeyRoute');
 const specializationsRoutes = require('./moduleRoutes/specializationsRoutes');
-
+const emailRoutes = require('./emailRoutes');
+const examSessionsRoutes = require('./examRoutes/examSessionsRoutes');
+const examRoutes = require('./examRoutes/examsRoutes');
 
 router.use('/modules', modulesRoutes);
 router.use('/categories', categoriesRoutes);
@@ -43,6 +45,10 @@ router.use('/api/downloads', downloadsroutes);
 router.use('/leaderboard', leaderboard);
 router.use('/api/googleAPIKey', googleAPIKeyRoute);
 router.use('/api/specializations', specializationsRoutes);
+router.use('/email', emailRoutes);
+router.use('/exam-sessions', examSessionsRoutes);
+router.use('/exams', examRoutes);
+
 
 
 
