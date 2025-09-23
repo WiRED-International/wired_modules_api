@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 module.exports = {
   "development": {
@@ -19,7 +20,7 @@ module.exports = {
     "username": process.env.AWS_DB_USER,
     "password": process.env.AWS_DB_PASS,
     "database": process.env.AWS_DB_NAME,
-    "host": '127.0.0.1',
+    "host": process.env.AWS_DB_HOST,
     "dialect": "mysql"
   }
 }
