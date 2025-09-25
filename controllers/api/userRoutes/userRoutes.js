@@ -416,6 +416,23 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
         return 0;
       });
     }
+    else if (sortBy === 'country') {
+      users.sort((a, b) => {
+        const countryA = a.country ? a.country.name : '';
+        const countryB = b.country ? b.country.name : '';
+        if (countryA < countryB) return sortOrder === sortAscend ? -1 : 1;
+        if (countryA > countryB) return sortOrder === sortAscend ? 1 : -1;
+        return 0;
+      });
+    } else if (sortBy === 'city') {
+      users.sort((a, b) => {
+        const cityA = a.city ? a.city.name : '';
+        const cityB = b.city ? b.city.name : '';
+        if (cityA < cityB) return sortOrder === sortAscend ? -1 : 1;
+        if (cityA > cityB) return sortOrder === sortAscend ? 1 : -1;
+        return 0;
+      });
+    }
 
     //pagination
     const start = offset;
