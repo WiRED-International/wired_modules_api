@@ -6,9 +6,6 @@ const multer = require("multer");
 
 const upload = multer(); // store file in memory
 
-console.log("🔍 ACCESS KEY:", process.env.AWS_ACCESS_KEY);
-console.log("🔍 SECRET KEY:", process.env.AWS_SECRET_KEY);
-
 AWS.config.update({
   region: "us-east-1", 
   accessKeyId: process.env.AWS_ACCESS_KEY,

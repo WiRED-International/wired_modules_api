@@ -32,7 +32,7 @@ QuizScores.init(
         onUpdate: 'CASCADE',
     },
     score: {
-        type: DataTypes.DECIMAL(5, 2),
+        type: DataTypes.FLOAT,
         allowNull: false,
     },
     date_taken: {

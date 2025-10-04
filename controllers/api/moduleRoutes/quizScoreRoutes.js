@@ -67,7 +67,7 @@ router.post('/', auth, async (req, res) => {
   try {
     const { module_id, user_id, score, date_taken } = req.body;
 
-    if (!module_id || !user_id || !score) {
+    if (module_id == null || user_id == null || score == null) {
       return res.status(400).json({ message: 'module_id, user_id, and score are required' });
     }
 
@@ -80,9 +80,9 @@ router.post('/', auth, async (req, res) => {
     }
 
     // Only Admins and Super Admins allowed
-    if (req.user.roleId === 1) {
-      return res.status(403).json({ message: 'Access denied. Only Admins can create or edit quiz scores.' });
-    }
+    // if (req.user.roleId === 1) {
+    //   return res.status(403).json({ message: 'Access denied. Only Admins can create or edit quiz scores.' });
+    // }
 
     // Find the module by the `module_id` field (not the primary key)
     const module = await Modules.findOne({ where: { module_id } });
@@ -107,7 +107,7 @@ router.post('/', auth, async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Error:', err);
+    console.error('Sequelize error stack:', err.stack);
     res.status(500).json({
       message: 'Internal Server Error',
       errors: err.errors || [],
