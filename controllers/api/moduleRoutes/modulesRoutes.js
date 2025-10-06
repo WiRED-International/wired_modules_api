@@ -2,10 +2,19 @@ const router = require('express').Router();
 const { Modules, SubCategories, Letters } = require('../../../models');
 
 router.get('/', async (req, res) => {
-  const { subcategoryId } = req.query;
+  const { subcategoryId, type } = req.query;
 
   try {
+    const typeFilter = typeof type === 'string' ? type.trim().toLowerCase() : undefined;
+    const whereClause = {};
+    if (typeFilter && ['module', 'animation'].includes(typeFilter)) {
+      whereClause.type = typeFilter; // ENUM('module','animation')
+    }
+
     const queryOptions = {
+      where: whereClause, 
+      distinct: true,
+      order: [['name', 'ASC']], 
       include: [
         {
           model: Modules,
