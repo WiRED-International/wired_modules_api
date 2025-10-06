@@ -50,6 +50,11 @@ Modules.init(
 	    onDelete: 'SET NULL',
 	    onUpdate: 'CASCADE',
         },
+        type: {
+            type: DataTypes.ENUM('module', 'animation'),
+            allowNull: false,
+            defaultValue: 'module',
+        },
     }, {
         sequelize,
         modelName: 'Modules',
