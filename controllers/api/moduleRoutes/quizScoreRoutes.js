@@ -2,14 +2,16 @@ const router = require('express').Router();
 const { QuizScores, Modules } = require('../../../models');
 const auth = require('../../../middleware/auth');
 const isAdmin = require('../../../middleware/isAdmin');
+const ROLES = require('../../../utils/roles');
 
 router.get('/', auth, async (req, res) => {
   const { userId } = req.query;
+  const userIsAdmin = req.user && (req.user.roleId === ROLES.ADMIN || req.user.roleId === ROLES.SUPER_ADMIN);
 
   try {
     let quizScores;
 
-    if (req.user.isAdmin) {
+    if (userIsAdmin) {
     
       const parsedUserId = userId ? parseInt(userId, 10) : null;
       const whereClause = parsedUserId ? { user_id: parsedUserId } : {};
