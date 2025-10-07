@@ -45,6 +45,7 @@ router.get('/', auth, async (req, res) => {
 
 router.get('/:id', auth, async (req, res) => {
   const { id } = req.params;
+  const userIsAdmin = req.user && (req.user.roleId === ROLES.ADMIN || req.user.roleId === ROLES.SUPER_ADMIN);
   try {
     const quizScore = await QuizScores.findByPk(id, {
       attributes: ['id', 'user_id', 'module_id', 'score', 'date_taken'],
@@ -55,7 +56,7 @@ router.get('/:id', auth, async (req, res) => {
     }
 
     // Ensure users can access only their own scores
-    if (!req.user.isAdmin && quizScore.user_id !== req.user.id) {
+    if (!userIsAdmin && quizScore.user_id !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
