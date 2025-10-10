@@ -53,7 +53,6 @@ router.get('/', auth, async (req, res) => {
         ]
       });
     }
-    console.log(quizScores[0]);
     res.status(200).json(quizScores);
   } catch (err) {
     console.error('Error creating QuizScores:', err);
