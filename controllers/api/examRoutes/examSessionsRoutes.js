@@ -3,107 +3,112 @@ const router = require("express").Router();
 const { Users, Exams, ExamSessions, ExamQuestions } = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require("../../../middleware/isAdmin");
+const { calculateScore } = require("../../../utils/examUtils");
 
-// Helper: Simple grading logic (can be extended)
-const calculateScore = async (userAnswers, examId) => {
-  const questions = await ExamQuestions.findAll({
-    where: { exam_id: examId },
-    attributes: ['id', 'correct_answer']
-  });
-
-  let correctCount = 0;
-
-  questions.forEach((q) => {
-    const userAnswer = userAnswers[q.id];
-    if (userAnswer && userAnswer === q.correct_answer) {
-      correctCount++;
-    }
-  });
-
-  const total = questions.length;
-  return (correctCount / total) * 100;
-};
-
-// POST /api/exams/:id/start-session
-router.post('/exams/:id/start-session', auth, async (req, res) => {
-  const exam_id = parseInt(req.params.id);
-  const user_id = req.user.id;
-
-  try {
-    const exam = await Exams.findByPk(exam_id);
-    if (!exam) return res.status(404).json({ message: 'Exam not found' });
-
-    const now = new Date();
-    if (now < exam.available_from || now > exam.available_until) {
-      return res.status(403).json({ message: 'Exam not currently available' });
-    }
-
-    // Check for past attempts
-    const attemptCount = await ExamSessions.count({ where: { user_id, exam_id } });
-
-    // Create new session
-    const session = await ExamSessions.create({
-      user_id,
-      exam_id,
-      attempt_number: attemptCount + 1,
-      created_at: now
-    });
-
-    // Fetch questions (without correct_answer)
-    const questions = await ExamQuestions.findAll({
-      where: { exam_id },
-      attributes: ['id', 'question_text', 'options'],
-      order: [['id', 'ASC']]
-    });
-
-    res.status(201).json({
-      session_id: session.id,
-      exam: {
-        id: exam.id,
-        title: exam.title,
-        available_from: exam.available_from,
-        available_until: exam.available_until,
-        duration_minutes: exam.duration_minutes
-      },
-      questions
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Failed to start exam session' });
-  }
-});
-
-// PUT /api/exam-sessions/:id/submit
-router.put('/exam-sessions/:id/submit', auth, async (req, res) => {
+// This route allows the user to submit their answers.
+router.put('/:id/submit', auth, async (req, res) => {
   const { id } = req.params;
-  const { answers } = req.body;
+  const { answers, exam_id } = req.body;
   const user_id = req.user.id;
 
+  console.log('\nParam id:', id);
+  console.log('Sequelize table name:', ExamSessions.getTableName());
+  console.log('--- SUBMIT DEBUG ---');
+  console.log('Authenticated user_id:', user_id);
+  console.log('--------------------');
+
+  let session; 
+
   try {
-    const session = await ExamSessions.findByPk(id);
-    if (!session || session.user_id !== user_id) {
-      return res.status(403).json({ message: 'Access denied' });
+    // 1️⃣ Find the session
+    session = await ExamSessions.findByPk(id);
+
+    // 2️⃣ Handle missing session (offline submission or reseeded DB)
+    if (!session) {
+      console.warn(`⚠️ No session found for ID ${id}`);
+
+      if (process.env.NODE_ENV !== 'production' && exam_id) {
+        console.log('🧩 Dev mode: attempting to create fallback session…');
+        try {
+          // try to create with the same primary key
+          session = await ExamSessions.create({
+            id: Number(id),      // may be allowed by your DB; if not, the catch below will handle it
+            exam_id: exam_id,
+            user_id,
+            attempt_number: 1,
+            created_at: new Date(),
+            submitted_at: null,
+            answers: [],
+            score: null,
+            active: true,
+          });
+          console.log('✅ Created fallback session with ID:', session.id);
+        } catch (e) {
+          console.warn('↪️ Could not create fallback with same ID, creating a new one instead:', e.message);
+          session = await ExamSessions.create({
+            exam_id: exam_id,
+            user_id,
+            attempt_number: 1,
+            created_at: new Date(),
+            submitted_at: null,
+            answers: [],
+            score: null,
+            active: true,
+          });
+          console.log('✅ Created fallback session with NEW ID:', session.id,
+                      '(client sent', id, 'but DB now uses', session.id, ')');
+        }
+      }
     }
 
+    console.log('Session found:', session ? 'yes' : 'no');
+    console.log('Session.id:', session?.id);
+    console.log('Session.user_id:', session?.user_id);
+
+    if (!session) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+
+    // 3️⃣ Ensure session belongs to the authenticated user
+    if (session.user_id !== user_id) {
+      return res.status(403).json({ message: 'Access denied — session does not belong to user' });
+    }
+
+    // 4️⃣ Prevent double submissions
     if (session.submitted_at) {
       return res.status(400).json({ message: 'Exam already submitted' });
     }
 
-    const score = await calculateScore(answers, session.exam_id);
+    // 5️⃣ Ensure answers exist
+    if (!Array.isArray(answers) || answers.length === 0) {
+      return res.status(400).json({ message: 'Answers missing or invalid format' });
+    }
 
+    // 6️⃣ Calculate score
+    const { score, correctCount, total } = await calculateScore(answers, session.exam_id);
+
+    // 7️⃣ Update the session
     await session.update({
       answers,
       score,
-      submitted_at: new Date()
+      submitted_at: new Date(),
+      active: false,
     });
 
+    console.log(`✅ Exam session ${session.id} submitted successfully.`);
+
+    // 8️⃣ Return success response
     res.status(200).json({
-      message: 'Exam submitted',
-      score: score.toFixed(2)
+      message: 'Exam submitted successfully',
+      score: Number.isFinite(score) ? score.toFixed(2) : '0.00',
+      correct_answers: correctCount,
+      total_questions: total,
+      resolved_session_id: session.id,
     });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error submitting exam' });
+    console.error('❌ Error submitting exam:', err);
+    res.status(500).json({ message: 'Error submitting exam', error: err.message });
   }
 });
 

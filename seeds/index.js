@@ -14,6 +14,9 @@ const seedAdminPermissions = require('./adminPermissions-seeds');
 const seedDownloads = require('./downloads-seeds')
 const seedQuizScores = require('./quizScores-seeds');
 const seedSpecializations = require('./specializations-seeds');
+const seedExams = require('./exams-seeds/exams-seeds');
+const seedExamQuestions = require('./exams-seeds/exam-questions-seeds');
+const seedExamUserAccess = require('./exams-seeds/exam-user-access-seeds');
 
 const seed = async () => {
     try {
@@ -84,6 +87,18 @@ const seed = async () => {
         console.log('Seeding quiz scores...');
         await seedQuizScores(); // Seed quiz scores
         console.log('Quiz scores seeded.');
+
+        console.log('Seeding exams...');
+        await seedExams(); // Seed exams
+        console.log('exams seeded.');
+
+        console.log('Seed exam questions...');
+        await seedExamQuestions(); // Seed exam questions
+        console.log('Exam questions seeded.')
+
+        console.log('Seeding exam user access...');
+        await seedExamUserAccess(); // Seed exam user access
+        console.log('Exam user access seeded.');
   
         console.log('Seeding completed successfully.');
 

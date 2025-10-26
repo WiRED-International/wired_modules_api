@@ -2,7 +2,7 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('exam_session', {
+    await queryInterface.createTable('exam_sessions', {
       id: {
         type: Sequelize.INTEGER,
         allowNull: false,
@@ -13,7 +13,7 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'exam',
+          model: 'exams',
           key: 'id'
         },
         onDelete: 'CASCADE'
@@ -43,6 +43,10 @@ module.exports = {
         type: Sequelize.FLOAT,
         allowNull: true
       },
+      active: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: true
+      },
       created_at: {
         allowNull: false,
         type: Sequelize.DATE,
@@ -57,6 +61,6 @@ module.exports = {
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('exam_session');
+    await queryInterface.dropTable('exam_sessions');
   }
 };

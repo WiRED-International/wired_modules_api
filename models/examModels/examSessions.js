@@ -17,7 +17,8 @@ ExamSessions.init(
             references: {
                 model: 'exams',
                 key: 'id'
-            }
+            },
+            onDelete: 'CASCADE'
         },
         user_id: {
             type: DataTypes.INTEGER,
@@ -39,6 +40,10 @@ ExamSessions.init(
         },
         score: {
             type: DataTypes.FLOAT
+        },
+        active: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
         },
     }, 
     {

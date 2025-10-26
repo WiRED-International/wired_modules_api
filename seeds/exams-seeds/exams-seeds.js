@@ -1,4 +1,4 @@
-const Exams = require('../../models/examModels/exam');
+const Exams = require('../../models/examModels/exams');
 
 const exams = [
   {

@@ -22,6 +22,7 @@ const specializationsRoutes = require('./moduleRoutes/specializationsRoutes');
 const emailRoutes = require('./emailRoutes');
 const examSessionsRoutes = require('./examRoutes/examSessionsRoutes');
 const examRoutes = require('./examRoutes/examsRoutes');
+const adminExamRoutes = require('./examRoutes/adminExamRoutes');
 
 router.use('/modules', modulesRoutes);
 router.use('/categories', categoriesRoutes);
@@ -48,8 +49,6 @@ router.use('/api/specializations', specializationsRoutes);
 router.use('/email', emailRoutes);
 router.use('/exam-sessions', examSessionsRoutes);
 router.use('/exams', examRoutes);
-
-
-
+router.use('/admin/exams', adminExamRoutes);
 
 module.exports = router;
