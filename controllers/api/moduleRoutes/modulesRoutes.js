@@ -1,6 +1,9 @@
 const router = require('express').Router();
 const { Modules, SubCategories, Letters } = require('../../../models');
 
+// ============================================
+// 🔹 GET all modules
+// ============================================
 router.get('/', async (req, res) => {
   const { subcategoryId, type } = req.query;
 
@@ -15,11 +18,24 @@ router.get('/', async (req, res) => {
       where: whereClause, 
       distinct: true,
       order: [['name', 'ASC']], 
+      attributes: [
+        'id',
+        'module_id',
+        'name',
+        'description',
+        'version',
+        'downloadLink',
+        'language',
+        'packageSize',
+        'type',
+        'credit_type',
+        'categories',
+      ],
       include: [
         {
           model: Modules,
           as: 'redirectedModule',
-          attributes: ['id', 'name', 'module_id', 'description', 'downloadLink', 'language'],
+          attributes: ['id', 'name', 'module_id', 'description', 'downloadLink', 'language',],
         },
         {
           model: SubCategories,
@@ -42,11 +58,14 @@ router.get('/', async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-//get modules name only
+
+// ============================================
+// 🔹 GET module names only
+// ============================================
 router.get('/names', async (req, res) => {
   try {
     const modules = await Modules.findAll({
-      attributes: ['id', 'name'],
+      attributes: ['id', 'module_id', 'name', 'credit_type', 'categories'],
       order: [['name', 'ASC']], 
     });
     res.status(200).json(modules);
@@ -87,7 +106,7 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-    const { name, module_id, description, version, downloadLink, language, packageSize, redirect_module_id, } = req.body;
+    const { name, module_id, description, version, downloadLink, language, packageSize, redirect_module_id, type, credit_type, categories, } = req.body;
   try {
 
     const newModule = await Modules.create({
@@ -99,6 +118,9 @@ router.post('/', async (req, res) => {
         language,
         packageSize,
         redirect_module_id,
+        type,
+        credit_type,
+        categories,
       });
 
     res.status(201).json({ module: newModule });
@@ -108,7 +130,7 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
-    const { name, module_id, description, version, downloadLink, language, packageSize, redirect_module_id } = req.body;
+    const { name, module_id, description, version, downloadLink, language, packageSize, redirect_module_id, type, credit_type, categories } = req.body;
   try {
     const module = await Modules.findByPk(req.params.id);
     if (!module) {
@@ -123,6 +145,9 @@ router.put('/:id', async (req, res) => {
         language,
         packageSize,
         redirect_module_id,
+        type,
+        credit_type,
+        categories,
     });
 
     res.status(200).json({ message: "Module updated successfully", module});

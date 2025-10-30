@@ -13,7 +13,7 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'exam', // use singular if your table is named 'exam'
+          model: 'exams', 
           key: 'id'
         },
         onDelete: 'CASCADE'
