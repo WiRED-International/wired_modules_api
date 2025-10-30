@@ -55,6 +55,17 @@ Modules.init(
             allowNull: false,
             defaultValue: 'module',
         },
+        credit_type: {
+            type: DataTypes.ENUM('none', 'cme'),
+            allowNull: false,
+            defaultValue: 'cme',
+            comment: 'Determines whether module awards CME credits on passing'
+        },
+        categories: {
+            type: DataTypes.JSON,
+            allowNull: true,
+            comment: 'List of tags such as specialization areas or topics'
+        },
     }, {
         sequelize,
         modelName: 'Modules',

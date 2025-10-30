@@ -33,6 +33,8 @@ router.get('/', auth, async (req, res) => {
               "language",
               "packageSize",
               "redirect_module_id",
+              'credit_type',
+              'categories',
             ],
             required: false,
           },
@@ -47,7 +49,7 @@ router.get('/', auth, async (req, res) => {
             {
                 model: Modules,
                 as: 'module',
-                attributes: ['id', 'name', 'module_id', 'description', 'version', 'downloadLink', 'language', 'packageSize', 'redirect_module_id'],
+                attributes: ['id', 'name', 'module_id', 'description', 'version', 'downloadLink', 'language', 'packageSize', 'redirect_module_id', 'credit_type', 'categories', ],
                 required: false,
             }
         ]
@@ -66,6 +68,14 @@ router.get('/:id', auth, async (req, res) => {
   try {
     const quizScore = await QuizScores.findByPk(id, {
       attributes: ['id', 'user_id', 'module_id', 'score', 'date_taken'],
+      include: [
+        {
+          model: Modules,
+          as: 'module',
+          attributes: ['id', 'name', 'credit_type', 'categories'],
+          required: false,
+        },
+      ],
     });
 
     if (!quizScore) {
@@ -99,11 +109,6 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Invalid user_id or score' });
     }
 
-    // Only Admins and Super Admins allowed
-    // if (req.user.roleId === 1) {
-    //   return res.status(403).json({ message: 'Access denied. Only Admins can create or edit quiz scores.' });
-    // }
-
     // Find the module by the `module_id` field (not the primary key)
     const module = await Modules.findOne({ where: { module_id } });
 
@@ -121,9 +126,21 @@ router.post('/', auth, async (req, res) => {
       date_taken: date_taken || new Date(),
     });
 
+    // 🧠 CME logic — 5 credits for score ≥ 80 only if module.credit_type === 'cme'
+    let credits_awarded = 0;
+    const passed = parsedScore >= 80;
+
+    if (passed && module.credit_type === 'cme') {
+      credits_awarded = 5;
+    }
+
     res.status(created ? 201 : 200).json({
       message: created ? 'Quiz Score created successfully' : 'Quiz Score updated successfully',
       quizScore,
+      passed,
+      credits_awarded,
+      credit_type: module.credit_type,
+      module_name: module.name,
     });
 
   } catch (err) {
