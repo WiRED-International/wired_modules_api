@@ -1,5 +1,5 @@
 const router = require("express").Router();
-const { Users, Roles, QuizScores, Modules, Countries, Cities, Organizations, Specializations } = require('../../../models');
+const { Users, Roles, QuizScores, Modules, Countries, Cities, Organizations, Specializations, AdminPermissions } = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require("../../../middleware/isAdmin");
 const { buildUserQueryFilters } = require("../../../middleware/accessControl");
@@ -27,7 +27,50 @@ router.get("/", auth, isAdmin, async (req, res) => {
   ]
   
   try {
-    const where = buildUserQueryFilters(req, { countryId, cityId, organizationId, roleId, sortBy, sortOrder, rowsPerPage, pageNumber });
+    const user = req.user;
+    let where = buildUserQueryFilters(req, { countryId, cityId, organizationId, roleId, sortBy, sortOrder, rowsPerPage, pageNumber });
+
+    // 🧹 Clean up undefined filters before use
+    Object.keys(where).forEach((key) => {
+      if (where[key] === undefined) delete where[key];
+    });
+
+        // 🧩 Super Admin → Full access (no restriction)
+    if (user.roleId === ROLES.SUPER_ADMIN) {
+      // no change needed, full access
+    }
+    // 🧩 Admin → Only users from allowed organizations
+    else if (user.roleId === ROLES.ADMIN) {
+      // Find all organizations the admin can access
+      console.log("👤 Logged-in user:", user);
+      const adminPermissions = await AdminPermissions.findAll({
+        where: { admin_id: user.id },
+        attributes: ['organization_id']
+      });
+      console.log("📊 AdminPermissions found:", adminPermissions.map(p => p.organization_id));
+      console.log("✅ AdminPermissions for admin", user.id, ":", adminPermissions.map(p => p.organization_id));
+      const allowedOrgIds = adminPermissions.map(p => p.organization_id).filter(Boolean);
+
+      if (allowedOrgIds.length === 0) {
+        return res.status(403).json({ message: "No organization access assigned to this admin." });
+      }
+
+      // Limit users to those organizations
+      // where = {
+      //   ...where,
+      //   organization_id: { [Op.in]: allowedOrgIds }
+      // };
+      if (allowedOrgIds.length > 0) {
+        where.organization_id = { [Op.in]: allowedOrgIds };
+      } else {
+        console.warn(`⚠️ Admin ${user.id} has no assigned organizations — returning no users.`);
+        where.organization_id = { [Op.in]: [] };
+      }
+    } 
+    // 🧩 Regular user → Only themselves
+    else {
+      where = { id: user.id };
+    }
 
     const order = [];
     if (sortBy) {
@@ -249,112 +292,166 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
   const { query, rowsPerPage = 10, pageNumber = 1, sortBy, sortOrder, organizationId, countryId, cityId, roleId } = req.query; // The search query
 
   try {
-    const where = buildUserQueryFilters(req);
+    const user = req.user;
 
-    if (query) {
-      where[Op.or] = [
-        { first_name: { [Op.like]: `%${query}%` } },
-        { last_name: { [Op.like]: `%${query}%` } },
-        { email: { [Op.like]: `%${query}%` } }
-      ];
+    // Build all WHERE pieces as ANDed clauses so nothing overwrites anything else.
+    const AND = [];
+
+    // ── Admin / Super Admin / User visibility rules ─────────────────────────────
+    if (user.roleId === ROLES.ADMIN) {
+      // 1) Org restriction via AdminPermissions
+      const adminPermissions = await AdminPermissions.findAll({
+        where: { admin_id: user.id },
+        attributes: ['organization_id'],
+      });
+
+      const allowedOrgIds = adminPermissions.map(p => p.organization_id).filter(Boolean);
+      console.log("📊 AdminPermissions for admin", user.id, ":", allowedOrgIds);
+
+      if (allowedOrgIds.length === 0) {
+        // No org access → no rows (or return 403)
+        return res.status(403).json({ message: "No organization access assigned to this admin." });
+      }
+      AND.push({ organization_id: { [Op.in]: allowedOrgIds } });
+
+      // 2) Role visibility: admins see regular users + themselves (not other admins/super)
+      AND.push({
+        [Op.or]: [
+          { role_id: ROLES.USER }, // regular users
+          { id: user.id },         // themselves
+        ]
+      });
+
+    } else if (user.roleId === ROLES.SUPER_ADMIN) {
+      // Super admins: full visibility (no org/role restriction)
+      // (Optionally allow query param roleId to filter)
+    } else {
+      // Regular user: only themselves
+      AND.push({ id: user.id });
     }
 
-    if (countryId && !isNaN(parseInt(countryId))) {
-      where.country_id = parseInt(countryId);
-    }
-    if (cityId && !isNaN(parseInt(cityId))) {
-      where.city_id = parseInt(cityId);
+    // ── Free-text search (name/email) ───────────────────────────────────────────
+    if (query && query.trim() !== '') {
+      AND.push({
+        [Op.or]: [
+          { first_name: { [Op.like]: `%${query}%` } },
+          { last_name:  { [Op.like]: `%${query}%` } },
+          { email:      { [Op.like]: `%${query}%` } },
+        ]
+      });
     }
 
-    if (organizationId && !isNaN(parseInt(organizationId))) {
-      where.organization_id = parseInt(organizationId);
-    }
-
+    // ── Optional explicit role filter from query (super admin only, or keep it for all) ─
     if (roleId && !isNaN(parseInt(roleId))) {
-      where.role_id = parseInt(roleId);
+      AND.push({ role_id: parseInt(roleId, 10) });
     }
 
+    const where = AND.length ? { [Op.and]: AND } : {};
     const limit = parseInt(rowsPerPage, 10) || 10;
     const page = parseInt(pageNumber, 10) || 1;
     const offset = (page - 1) * limit;
 
-    //due to the complexity of sorting by associated models, we will do the sorting in JavaScript after fetching the data
-    // this is not ideal for large datasets, but it is acceptable for small to moderate datasets. if the dataset grows too large, we may need to implement a more complex solution using raw SQL queries or a different ORM that supports more advanced sorting capabilities.
-    // another option would be to create separate endpoints for each type of sorting that requires associated models, but that would lead to a proliferation of endpoints and is not a great solution either.
+    console.log("🧭 Final WHERE (broad search):", JSON.stringify(where, null, 2));
 
-    // const order = [];
-    // if (sortBy) {
-    //   const allowedSortFields = [
-    //     "first_name",
-    //     "last_name",
-    //     "email",
-    //     "CME_Credits",
-    //     "remainingCredits",
-    //     "specializations",
-    //     "role",
-    //     "country",
-    //     "city",
-    //     "organization"
-    //   ];
-    //   const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'last_name'; // Default to last_name if sortBy is not allowed
-    //   const safeSortOrder = sortOrder?.toUpperCase() === sortAscend ? sortAscend : sortDescend;
-    //   switch (safeSortBy) {
-    //     case 'organization':
-    //       order.push([{ model: Organizations, as: 'organization' }, 'name', safeSortOrder]);
-    //       break;      
-    //     case 'role':
-    //       order.push([{ model: Roles, as: 'role' }, 'name', safeSortOrder]);
-    //       break;
-    //     case 'country':
-    //       order.push([{ model: Countries, as: 'country' }, 'name', safeSortOrder]);
-    //       break;
-    //     case 'city':
-    //       order.push([{ model: Cities, as: 'city' }, 'name', safeSortOrder]);
-    //       break;
-    //     case 'specializations':
-    //       // Always ASC for alphabetic sorting of first specialization
-    //       order.push([{ model: Specializations, as: 'specializations' }, 'name', sortAscend]);
-    //       break;
-    //     default:
-    //       // Sorting by field on Users table
-    //       order.push([safeSortBy, safeSortOrder]);
-    //   }
-    // } else {
-    //   order.push(['last_name', sortAscend]); // Default sort by last_name if no sortBy provided
-    // }
-    
-
-    // Count total users matching filters
     const totalUsers = await Users.count({ where });
     const pageCount = Math.ceil(totalUsers / limit);
 
+//     const users = await Users.findAll({
+//       where,
+//       attributes: ["id", "first_name", "last_name", "email"],
+//       include: [
+//         { model: Organizations, as: "organization", attributes: ["name", "id"], required: false },
+//         { model: Roles,         as: "role",         attributes: ["name", "id"] },
+//         { model: Countries,     as: "country",      attributes: ["name", "id"], required: false },
+//         { model: Cities,        as: "city",         attributes: ["name"],        required: false },
+//         {
+//           model: QuizScores, as: "quizScores", attributes: ["score", "date_taken"],
+//           include: [{ model: Modules, as: "module", attributes: ["name", "module_id"] }],
+//           required: false,
+//         },
+//         { model: Specializations, as: 'specializations', attributes: ['name'], required: false },
+//       ],
+//       // (You’re sorting client-side; keep as-is, or add order/limit/offset here)
+//     });
+
+//     // 🧮 Sort results before pagination
+//     if (sortBy) {
+//       const direction = (sortOrder && sortOrder.toUpperCase() === 'DESC') ? -1 : 1;
+
+//       users.sort((a, b) => {
+//         const valA =
+//           sortBy === 'organization' ? a.organization?.name ?? '' :
+//           sortBy === 'role'         ? a.role?.name ?? '' :
+//           sortBy === 'country'      ? a.country?.name ?? '' :
+//           sortBy === 'city'         ? a.city?.name ?? '' :
+//           (a[sortBy] ?? '');
+
+//         const valB =
+//           sortBy === 'organization' ? b.organization?.name ?? '' :
+//           sortBy === 'role'         ? b.role?.name ?? '' :
+//           sortBy === 'country'      ? b.country?.name ?? '' :
+//           sortBy === 'city'         ? b.city?.name ?? '' :
+//           (b[sortBy] ?? '');
+
+//         return valA.toString().localeCompare(valB.toString(), undefined, { sensitivity: 'base' }) * direction;
+//       });
+//     } else {
+//       // Default sort by last_name ASC
+//       users.sort((a, b) =>
+//         a.last_name.localeCompare(b.last_name, undefined, { sensitivity: 'base' })
+//       );
+//     }
+
+//     // client-side sort + pagination (your existing code)
+//     // ... keep your sort code ...
+//     const start = offset;
+//     const end = offset + limit;
+//     const paginatedUsers = users.slice(start, end);
+
+//     return res.status(200).json({ users: paginatedUsers, totalUsers, page, rowsPerPage: limit, pageCount });
+//   } catch (err) {
+//     console.error(err);
+//     return res.status(500).json({ message: err.message });
+//   }
+// });
+
+// ── SQL-level sorting ───────────────────────────────────────────────────────
+    const order = [];
+    if (sortBy) {
+      const direction = sortOrder?.toUpperCase() === "DESC" ? "DESC" : "ASC";
+      switch (sortBy) {
+        case "organization":
+        case "organization.name":
+          order.push([{ model: Organizations, as: "organization" }, "name", direction]);
+          break;
+        case "role":
+        case "role.name":
+          order.push([{ model: Roles, as: "role" }, "name", direction]);
+          break;
+        case "country":
+        case "country.name":
+          order.push([{ model: Countries, as: "country" }, "name", direction]);
+          break;
+        case "city":
+        case "city.name":
+          order.push([{ model: Cities, as: "city" }, "name", direction]);
+          break;
+        default:
+          order.push([sortBy, direction]);
+      }
+    } else {
+      order.push(["last_name", "ASC"]);
+    }
+
+    // ── Query users ────────────────────────────────────────────────────────────
     const users = await Users.findAll({
       where,
       attributes: ["id", "first_name", "last_name", "email"],
       include: [
-        {
-          model: Organizations,
-          as: "organization",
-          attributes: ["name", "id"],
-          required: false,
-        },
-        {
-          model: Roles,
-          as: "role",
-          attributes: ["name", "id"],
-        },
-        {
-          model: Countries,
-          as: "country",
-          attributes: ["name", "id"],
-          required: false,
-        },
-        {
-          model: Cities,
-          as: "city",
-          attributes: ["name"],
-          required: false,
-        },
+        { model: Organizations, as: "organization", attributes: ["name", "id"], required: false },
+        { model: Roles, as: "role", attributes: ["name", "id"] },
+        { model: Countries, as: "country", attributes: ["name", "id"], required: false },
+        { model: Cities, as: "city", attributes: ["name"], required: false },
         {
           model: QuizScores,
           as: "quizScores",
@@ -363,93 +460,45 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
             {
               model: Modules,
               as: "module",
-              attributes: ["name", "module_id"],
+              attributes: ["id", "name", "module_id", "categories"],
             },
           ],
           required: false,
         },
-        {
-          model: Specializations,
-          as: 'specializations',
-          attributes: ['name'],
-          required: false, // Allow users without specializations to still be returned
-          group: ['users.id'],
-        }
+        { model: Specializations, as: "specializations", attributes: ["name"], required: false },
       ],
-
-      //sorting and pagination will be handled in JavaScript after fetching the data
-
-      // order,
-      // limit,
-      // offset,
-      // distinct: true,
-      // subQuery: false,
+      order,
+      limit,
+      offset,
     });
-    if(sortBy === 'last_name' || !sortBy) {
-      users.sort((a, b) => {
-        const nameA = a.last_name.toUpperCase(); // ignore upper and lowercase
-        const nameB = b.last_name.toUpperCase(); // ignore upper and lowercase
-        if (nameA < nameB) return sortOrder === sortAscend ? -1 : 1;
-        if (nameA > nameB) return sortOrder === sortAscend ? 1 : -1;
-        return 0;
-      });
-    } else if (sortBy === 'first_name') {
-      users.sort((a, b) => {
-        const nameA = a.first_name.toUpperCase(); // ignore upper and lowercase
-        const nameB = b.first_name.toUpperCase(); // ignore upper and lowercase
-        if (nameA < nameB) return sortOrder === sortAscend ? -1 : 1;
-        if (nameA > nameB) return sortOrder === sortAscend ? 1 : -1;
-        return 0;
-      });
-    } else if (sortBy === 'email') {
-      users.sort((a, b) => {
-        const nameA = a.email.toUpperCase(); // ignore upper and lowercase
-        const nameB = b.email.toUpperCase(); // ignore upper and lowercase
-        if (nameA < nameB) return sortOrder === sortAscend ? -1 : 1;
-        if (nameA > nameB) return sortOrder === sortAscend ? 1 : -1;
-        return 0;
-      });
-    } else if (sortBy === 'organization') {
-      users.sort((a, b) => {
-        const orgA = a.organization ? a.organization.name : '';
-        const orgB = b.organization ? b.organization.name : '';
-        if (orgA < orgB) return sortOrder === sortAscend ? -1 : 1;
-        if (orgA > orgB) return sortOrder === sortAscend ? 1 : -1;
-        return 0;
-      });
-    } else if (sortBy === 'role') {
-      users.sort((a, b) => {
-        const roleA = a.role ? a.role.name : '';
-        const roleB = b.role ? b.role.name : '';
-        if (roleA < roleB) return sortOrder === sortAscend ? -1 : 1;
-        if (roleA > roleB) return sortOrder === sortAscend ? 1 : -1;
-        return 0;
-      });
-    }
-    else if (sortBy === 'country') {
-      users.sort((a, b) => {
-        const countryA = a.country ? a.country.name : '';
-        const countryB = b.country ? b.country.name : '';
-        if (countryA < countryB) return sortOrder === sortAscend ? -1 : 1;
-        if (countryA > countryB) return sortOrder === sortAscend ? 1 : -1;
-        return 0;
-      });
-    } else if (sortBy === 'city') {
-      users.sort((a, b) => {
-        const cityA = a.city ? a.city.name : '';
-        const cityB = b.city ? b.city.name : '';
-        if (cityA < cityB) return sortOrder === sortAscend ? -1 : 1;
-        if (cityA > cityB) return sortOrder === sortAscend ? 1 : -1;
-        return 0;
-      });
-    }
 
-    //pagination
-    const start = offset;
-    const end = offset + limit;
-    const paginatedUsers = users.slice(start, end);
+    // 🔹 Compute basic module completion for each user
+    const TOTAL_BASIC_MODULES = 28;
+    for (const user of users) {
+      const quizScores = user.quizScores || [];
+      
+      // Count "basic" modules with score >= 80
+      const completedBasics = quizScores.filter(qs =>
+        qs.score >= 80 &&
+        Array.isArray(qs.module?.categories) &&
+        qs.module.categories.includes('basic')
+      ).length;
 
-    return res.status(200).json({ users: paginatedUsers, totalUsers, page, rowsPerPage: limit, pageCount });
+      const percent = TOTAL_BASIC_MODULES > 0
+        ? (completedBasics / TOTAL_BASIC_MODULES) * 100
+        : 0;
+
+      // Attach field to each user for frontend display
+      user.setDataValue('basicCompletionPercent', parseFloat(percent.toFixed(2)));
+    };
+
+    return res.status(200).json({
+      users,
+      totalUsers,
+      page,
+      rowsPerPage: limit,
+      pageCount,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: err.message });
@@ -468,6 +517,10 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
         "first_name",
         "last_name",
         "email",
+        "organization_id",
+        "country_id",
+        "city_id",
+        "role_id"
       ],
       include: [
         {
@@ -498,7 +551,7 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
             {
               model: Modules,
               as: 'module',
-              attributes: ['name', 'module_id',],
+              attributes: ['name', 'module_id', 'categories', 'credit_type',],
             },
           ],
         },
@@ -517,15 +570,35 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
 
     const requester = req.user;
 
+    // SUPER ADMIN → full access
+    if (requester.roleId === ROLES.SUPER_ADMIN) {
+      return res.status(200).json(user);
+    }
+
+    // 🧩 ADMIN → limited access
     if (requester.roleId === ROLES.ADMIN) {
-      if (user.organization_id !== requester.organization_id || user.country_id !== requester.country_id) {
-        return res.status(403).json({ message: "Access denied. You can only view users within your assigned organization and country." });
+      // Allow admins to always view their own profile
+      if (requester.id === targetUserId) {
+        return res.status(200).json(user);
+      }
+      // Get all orgs this admin has permission for
+      const adminPermissions = await AdminPermissions.findAll({
+        where: { admin_id: requester.id },
+        attributes: ["organization_id"],
+      });
+      const allowedOrgIds = adminPermissions.map(p => p.organization_id);
+
+      // Restrict to allowed orgs only
+      if (!allowedOrgIds.includes(user.organization_id)) {
+        return res.status(403).json({
+          message: "Access denied. You can only view users within your assigned organizations.",
+        });
       }
 
       // Optional city restriction
-      if (requester.city_id && user.city_id !== requester.city_id) {
-        return res.status(403).json({ message: "Access denied. You can only view users within your assigned city." });
-      }
+      // if (requester.city_id && user.city_id !== requester.city_id) {
+      //   return res.status(403).json({ message: "Access denied. You can only view users within your assigned city." });
+      // }
 
       // Role restriction
       if (user.role_id !== ROLES.USER) {

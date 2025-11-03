@@ -14,7 +14,9 @@ router.get('/', auth, async (req, res) => {
     if (userIsAdmin) {
     
       const parsedUserId = userId ? parseInt(userId, 10) : null;
-      const whereClause = parsedUserId ? { user_id: parsedUserId } : {};
+      const whereClause = parsedUserId
+        ? { user_id: parsedUserId }
+        : { user_id: req.user.id };
 
       quizScores = await QuizScores.findAll({
         where: whereClause,
