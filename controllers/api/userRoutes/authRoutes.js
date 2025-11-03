@@ -72,7 +72,7 @@ router.post('/login', async (req, res) => {
         country_id: user.country_id,
         city_id: user.city_id,
         //adding organization_id to the token so it can be used in certain queries
-        organization_id: user.organization_id,
+        // organization_id: user.organization_id,
       }, 
       secret, 
       { expiresIn: '10y' }

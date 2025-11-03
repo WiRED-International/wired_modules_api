@@ -9,7 +9,7 @@ const isAdmin = (req, res, next) => {
   if (!allowedRoles.includes(req.user.roleId)) {
     return res.status(403).json({ message: 'Admin access required' });
   }
-
+  console.log("🔍 Decoded JWT:", req.user);
   next();
 };
 
