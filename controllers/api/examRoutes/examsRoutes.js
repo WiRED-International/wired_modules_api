@@ -78,12 +78,13 @@ router.post('/:id/start-session', auth, async (req, res) => {
   const user_id = req.user.id;
 
   try {
+    // ✅ Include correct field name (correct_answers instead of correct_answer)
     const exam = await Exams.findByPk(exam_id, {
       include: [
         { 
           model: ExamQuestions, 
           as: 'exam_questions', 
-          attributes: ['id', 'question_text', 'options', 'correct_answer'] 
+          attributes: ['id', 'question_text', 'options', 'correct_answers'] 
         },
       ],
     });
@@ -92,7 +93,6 @@ router.post('/:id/start-session', auth, async (req, res) => {
       return res.status(404).json({ message: 'Exam not found' });
     }
 
-    console.log('Exam questions:', exam?.questions)
     // ✅ Shuffle questions and their options
     const { shuffledQuestions, questionOrder } = shuffleExamQuestions(exam.exam_questions, true);
 
@@ -146,7 +146,7 @@ router.post('/:id/start-session', auth, async (req, res) => {
       shuffle_order: JSON.stringify(questionOrder),
     });
 
-    // ✅ Fetch questions
+    // ✅ Fetch questions again (no correct_answers here — students shouldn’t see answers)
     const questions = await ExamQuestions.findAll({
       where: { exam_id },
       attributes: ['id', 'question_text', 'options'],

@@ -28,14 +28,6 @@ ExamUserAccess.init(
       },
       onDelete: 'CASCADE',
     },
-    available_from: {
-      type: DataTypes.DATE,
-      allowNull: true, // optional override
-    },
-    available_until: {
-      type: DataTypes.DATE,
-      allowNull: true, // optional override
-    },
     max_attempts: {
       type: DataTypes.INTEGER,
       allowNull: true,
@@ -48,10 +40,6 @@ ExamUserAccess.init(
         model: 'users',
         key: 'id',
       },
-    },
-    reason: {
-      type: DataTypes.TEXT,
-      allowNull: true,
     },
   },
   {

@@ -60,6 +60,8 @@ ExamUserAccess.belongsTo(Exams, { as: 'exams', foreignKey: 'exam_id' });
 Users.hasMany(ExamUserAccess, { as: 'exam_user_access', foreignKey: 'user_id' });
 ExamUserAccess.belongsTo(Users, { as: 'users', foreignKey: 'user_id' });
 
+ExamUserAccess.belongsTo(Users, { as: 'granted_by_user', foreignKey: 'granted_by' });
+
 // ===============================
 // 📘 MODULE-RELATED ASSOCIATIONS
 // ===============================

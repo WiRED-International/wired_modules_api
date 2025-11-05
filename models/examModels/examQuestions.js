@@ -1,7 +1,7 @@
 const { Model, DataTypes } = require('sequelize');
 const sequelize = require('../../config/connection');
 
-class ExamQuestions extends Model {};
+class ExamQuestions extends Model {}
 
 ExamQuestions.init(
   {
@@ -19,6 +19,11 @@ ExamQuestions.init(
       },
       onDelete: 'CASCADE'
     },
+    question_type: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'single' // 'single' or 'multiple'
+    },
     question_text: {
       type: DataTypes.TEXT,
       allowNull: false
@@ -28,15 +33,16 @@ ExamQuestions.init(
       allowNull: false
       // Example: { "a": "Option A", "b": "Option B", "c": "Option C", "d": "Option D" }
     },
-    correct_answer: {
-      type: DataTypes.STRING,
-      allowNull: false
-      // e.g., "b"
+    correct_answers: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: [] 
+      // Example: ["a", "c", "d", "e"]
     },
     order: {
       type: DataTypes.INTEGER,
       allowNull: true
-    },
+    }
   },
   {
     sequelize,
@@ -47,5 +53,12 @@ ExamQuestions.init(
     underscored: true
   }
 );
+
+// ✅ SAFETY HOOK: guarantees correct_answers is never null before insert/update
+ExamQuestions.beforeValidate((question) => {
+  if (question.correct_answers == null) {
+    question.correct_answers = [];
+  }
+});
 
 module.exports = ExamQuestions;
