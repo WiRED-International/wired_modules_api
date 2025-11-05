@@ -18,6 +18,11 @@ module.exports = {
         },
         onDelete: 'CASCADE'
       },
+      question_type: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        defaultValue: 'single', // 'single' or 'multiple'
+      },
       question_text: {
         type: Sequelize.TEXT,
         allowNull: false
@@ -26,9 +31,10 @@ module.exports = {
         type: Sequelize.JSON,
         allowNull: false
       },
-      correct_answer: {
-        type: Sequelize.STRING,
-        allowNull: false
+      correct_answers: { 
+        type: Sequelize.JSON,
+        allowNull: false,
+        defaultValue: []
       },
       order: {
         type: Sequelize.INTEGER,

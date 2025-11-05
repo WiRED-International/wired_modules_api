@@ -21,6 +21,34 @@ router.get('/', auth, isAdmin, async (req, res) => {
   }
 });
 
+// 🧠 Add questions to an existing exam
+router.post('/:examId/questions', auth, isAdmin, async (req, res) => {
+  const { examId } = req.params;
+  const { questions } = req.body;
+
+  if (!Array.isArray(questions) || questions.length === 0) {
+    return res.status(400).json({ message: 'Questions array is required.' });
+  }
+
+  try {
+    const created = await Promise.all(
+      questions.map(q =>
+        ExamQuestions.create({
+          exam_id: examId,
+          question_text: q.question_text,
+          options: q.options,
+          correct_answer: q.correct_answer,
+        })
+      )
+    );
+
+    res.status(201).json({ message: 'Questions added successfully.', created });
+  } catch (err) {
+    console.error('❌ Failed to add questions:', err);
+    res.status(500).json({ message: 'Failed to add questions', error: err.message });
+  }
+});
+
 /**
  * 🧩 POST /api/admin/exams
  * Create a new exam
@@ -39,24 +67,44 @@ router.post('/', auth, isAdmin, async (req, res) => {
  * 🧾 POST /api/admin/exams/:id/assign
  * Assign specific users to an exam (creates ExamUserAccess records)
  */
-router.post('/:id/assign', auth, isAdmin, async (req, res) => {
-  const exam_id = req.params.id;
+router.post('/:examId/assign', auth, isAdmin, async (req, res) => {
+  const { examId } = req.params;
   const { user_ids, max_attempts } = req.body;
 
+  // 🔹 Basic validation
   if (!Array.isArray(user_ids) || user_ids.length === 0) {
     return res.status(400).json({ message: 'No user IDs provided.' });
   }
 
   try {
+    // ✅ Verify that the exam exists (optional but good practice)
+    const exam = await Exams.findByPk(examId);
+    if (!exam) {
+      return res.status(404).json({ message: 'Exam not found.' });
+    }
+
+    // ✅ Create ExamUserAccess entries
     const records = await Promise.all(
-      user_ids.map(user_id =>
-        ExamUserAccess.create({ exam_id, user_id, max_attempts })
-      )
+      user_ids.map(async (user_id) => {
+        return ExamUserAccess.create({
+          exam_id: examId,
+          user_id,
+          max_attempts: max_attempts ?? 1,  // default to 1 attempt
+          granted_by: req.user.id,          // record which admin granted access
+        });
+      })
     );
-    res.status(201).json({ message: 'Access granted successfully.', records });
+
+    res.status(201).json({
+      message: `Access granted successfully to ${records.length} user(s).`,
+      records,
+    });
   } catch (err) {
     console.error('❌ Failed to assign users:', err);
-    res.status(500).json({ message: 'Failed to assign users', error: err.message });
+    res.status(500).json({
+      message: 'Failed to assign users',
+      error: err.message,
+    });
   }
 });
 
@@ -170,5 +218,67 @@ router.get('/sessions/:sessionId/details', auth, isAdmin, async (req, res) => {
     res.status(500).json({ message: 'Failed to load exam session details' });
   }
 });
+
+// 📋 View all users with access to an exam
+router.get('/:examId/access', auth, isAdmin, async (req, res) => {
+  const { examId } = req.params;
+  try {
+    const accessList = await ExamUserAccess.findAll({
+      where: { exam_id: examId },
+      include: [
+        { model: Users, as: 'users', attributes: ['id', 'first_name', 'last_name', 'email', 'role_id'] },
+        { model: Exams, as: 'exams', attributes: ['id', 'title', 'available_from', 'available_until'] },
+        { model: Users, as: 'granted_by_user', attributes: ['id', 'first_name', 'last_name', 'email'] }
+      ],
+      order: [['created_at', 'DESC']],
+    });
+
+    res.json(accessList);
+  } catch (err) {
+    console.error('❌ Error fetching exam access list:', err);
+    res.status(500).json({ message: 'Failed to fetch access list' });
+  }
+});
+
+// 👤 View all exams assigned to a specific user
+router.get('/users/:userId/exams', auth, isAdmin, async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const accessibleExams = await ExamUserAccess.findAll({
+      where: { user_id: userId },
+      include: [
+        { model: Exams, as: 'exams', attributes: ['id', 'title', 'available_from', 'available_until'] }
+      ],
+      order: [['created_at', 'DESC']],
+    });
+
+    res.json(accessibleExams);
+  } catch (err) {
+    console.error('❌ Error fetching user exam list:', err);
+    res.status(500).json({ message: 'Failed to fetch user exam list' });
+  }
+});
+
+// 📊 Summary: count how many users have access per exam
+router.get('/summary', auth, isAdmin, async (req, res) => {
+  try {
+    const examSummary = await ExamUserAccess.findAll({
+      attributes: [
+        'exam_id',
+        [ExamUserAccess.sequelize.fn('COUNT', ExamUserAccess.sequelize.col('user_id')), 'total_students']
+      ],
+      include: [
+        { model: Exams, as: 'exams', attributes: ['id', 'title'] }
+      ],
+      group: ['exam_id', 'exams.id']
+    });
+
+    res.json(examSummary);
+  } catch (err) {
+    console.error('❌ Error fetching exam summary:', err);
+    res.status(500).json({ message: 'Failed to fetch exam summary' });
+  }
+});
+
 
 module.exports = router;

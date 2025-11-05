@@ -30,14 +30,6 @@ module.exports = {
         onDelete: 'CASCADE',
         onUpdate: 'CASCADE',
       },
-      available_from: {
-        type: Sequelize.DATE,
-        allowNull: true,
-      },
-      available_until: {
-        type: Sequelize.DATE,
-        allowNull: true,
-      },
       max_attempts: {
         type: Sequelize.INTEGER,
         allowNull: true,
@@ -52,10 +44,6 @@ module.exports = {
         },
         onDelete: 'SET NULL',
         onUpdate: 'CASCADE',
-      },
-      reason: {
-        type: Sequelize.TEXT,
-        allowNull: true,
       },
       created_at: {
         type: Sequelize.DATE,
