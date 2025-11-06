@@ -287,7 +287,13 @@ router.get("/search", auth, isAdmin, async (req, res) => {
   }
 });
 
-//search users by first name, last name, or email with one broad search query
+// ─────────────────────────────────────────────────────────────
+// GET /search/broad
+// Paginated, sortable, searchable user listing (with count cache)
+// ─────────────────────────────────────────────────────────────
+const countCache = new Map(); // Simple in-memory cache
+const CACHE_TTL_MS = 10_000; // 10 seconds per unique query key
+
 router.get("/search/broad", auth, isAdmin, async (req, res) => {
   const {
     query,
@@ -295,9 +301,6 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
     pageNumber = 1,
     sortBy,
     sortOrder,
-    organizationId,
-    countryId,
-    cityId,
     roleId,
   } = req.query;
 
@@ -305,9 +308,7 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
     const user = req.user;
     const AND = [];
 
-    // ───────────────────────────────────────────────
-    // 🧩 Role-based visibility control
-    // ───────────────────────────────────────────────
+    // ── Role-based visibility ───────────────────────────────
     if (user.roleId === ROLES.ADMIN) {
       const adminPermissions = await AdminPermissions.findAll({
         where: { admin_id: user.id },
@@ -315,30 +316,21 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
       });
 
       const allowedOrgIds = adminPermissions.map((p) => p.organization_id).filter(Boolean);
-      if (allowedOrgIds.length === 0) {
+      if (allowedOrgIds.length === 0)
         return res.status(403).json({ message: "No organization access assigned to this admin." });
-      }
 
       AND.push({ organization_id: { [Op.in]: allowedOrgIds } });
-      AND.push({
-        [Op.or]: [
-          { role_id: ROLES.USER },
-          { id: user.id },
-        ],
-      });
+      AND.push({ [Op.or]: [{ role_id: ROLES.USER }, { id: user.id }] });
     } else if (user.roleId !== ROLES.SUPER_ADMIN) {
-      AND.push({ id: user.id }); // regular user → only themselves
+      AND.push({ id: user.id });
     }
 
-    // ───────────────────────────────────────────────
-    // 🧩 Free-text broad search (Users + associations)
-    // ───────────────────────────────────────────────
+    // ── Free-text search ───────────────────────────────
     const buildBroadSearch = (term) => {
       if (!term || !term.trim()) return {};
       const q = term.trim();
       return {
         [Op.or]: [
-          // Base table fields
           { first_name: { [Op.like]: `%${q}%` } },
           { last_name:  { [Op.like]: `%${q}%` } },
           { email:      { [Op.like]: `%${q}%` } },
@@ -350,9 +342,6 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
       };
     };
 
-    // ───────────────────────────────────────────────
-    // 🧩 Combine filters
-    // ───────────────────────────────────────────────
     const where = {
       [Op.and]: [
         ...AND,
@@ -365,111 +354,109 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
     const page = parseInt(pageNumber, 10);
     const offset = (page - 1) * limit;
 
-    // ───────────────────────────────────────────────
-    // 🧩 Includes (shared between count + findAll)
-    // ───────────────────────────────────────────────
-    const include = [
-      {
-        model: Organizations,
-        as: "organization",
-        attributes: ["id", "name"],
-        required: false,
-        // where: query ? { name: { [Op.like]: `%${query}%` } } : undefined,
-      },
-      {
-        model: Roles,
-        as: "role",
-        attributes: ["id", "name"],
-        required: false,
-        // where: query ? { name: { [Op.like]: `%${query}%` } } : undefined,
-      },
-      {
-        model: Countries,
-        as: "country",
-        attributes: ["id", "name"],
-        required: false,
-        // where: query ? { name: { [Op.like]: `%${query}%` } } : undefined,
-      },
-      {
-        model: Cities,
-        as: "city",
-        attributes: ["id", "name"],
-        required: false,
-        // where: query ? { name: { [Op.like]: `%${query}%` } } : undefined,
-      },
-      {
-        model: QuizScores,
-        as: "quizScores",
-        attributes: ["score", "date_taken"],
-        include: [
-          { model: Modules, as: "module", attributes: ["id", "name", "module_id", "categories"] },
-        ],
-        required: false,
-      },
-      { model: Specializations, as: "specializations", attributes: ["name"], required: false },
+    // ── Common includes ───────────────────────────────
+    const includeBase = [
+      { model: Organizations, as: "organization", attributes: ["id", "name"], required: false },
+      { model: Roles,         as: "role",         attributes: ["id", "name"], required: false },
+      { model: Countries,     as: "country",      attributes: ["id", "name"], required: false },
+      { model: Cities,        as: "city",         attributes: ["id", "name"], required: false },
     ];
 
-    // ───────────────────────────────────────────────
-    // 🧩 Count total with includes (important!)
-    // ───────────────────────────────────────────────
-    const totalUsers = await Users.count({ where, include });
-    const pageCount = Math.ceil(totalUsers / limit);
-
-    // ───────────────────────────────────────────────
-    // 🧩 Sorting (base + joined tables, fixed)
-    // ───────────────────────────────────────────────
+    // ── Sorting ───────────────────────────────
     const order = [];
     const direction = sortOrder?.toUpperCase() === "DESC" ? "DESC" : "ASC";
 
     switch (sortBy) {
       case "organization":
       case "organization.name":
-        include.find(i => i.as === "organization").required = true;
         order.push([{ model: Organizations, as: "organization" }, "name", direction]);
         break;
-
       case "role":
       case "role.name":
-        include.find(i => i.as === "role").required = true;
         order.push([{ model: Roles, as: "role" }, "name", direction]);
         break;
-
       case "country":
       case "country.name":
-        include.find(i => i.as === "country").required = true;
         order.push([{ model: Countries, as: "country" }, "name", direction]);
         break;
-
       case "city":
       case "city.name":
-        include.find(i => i.as === "city").required = true;
         order.push([{ model: Cities, as: "city" }, "name", direction]);
         break;
-
       case "email":
       case "first_name":
       case "last_name":
         order.push([sortBy, direction]);
         break;
-
       default:
         order.push(["last_name", "ASC"]);
     }
 
-    // ───────────────────────────────────────────────
-    // 🧩 Fetch paginated results
-    // ───────────────────────────────────────────────
-    const users = await Users.findAll({
+    const extraOrderCol =
+      sortBy && ["email", "first_name", "last_name"].includes(sortBy)
+        ? [sortBy]
+        : [];
+
+    // ── Step 1: Fetch distinct user IDs ───────────────────────────────
+    const userIdRows = await Users.findAll({
       where,
-      include,
+      include: includeBase,
+      attributes: [
+        [Sequelize.fn("DISTINCT", Sequelize.col("Users.id")), "id"],
+        ...extraOrderCol.map((col) => Sequelize.col(`Users.${col}`)),
+      ],
       order,
       limit,
       offset,
+      raw: true,
+      subQuery: false,
+    });
+
+    const userIds = userIdRows.map((r) => r.id);
+    if (userIds.length === 0)
+      return res.status(200).json({ users: [], totalUsers: 0, page, rowsPerPage: limit, pageCount: 0 });
+
+    // ── Step 2: Fetch full user data ───────────────────────────────
+    const users = await Users.findAll({
+      where: { id: { [Op.in]: userIds } },
+      include: [
+        ...includeBase,
+        {
+          model: QuizScores,
+          as: "quizScores",
+          attributes: ["score", "date_taken"],
+          include: [
+            { model: Modules, as: "module", attributes: ["id", "name", "module_id", "categories"] },
+          ],
+          required: false,
+        },
+        { model: Specializations, as: "specializations", attributes: ["name"], required: false },
+      ],
+      order,
       subQuery: false,
       attributes: ["id", "first_name", "last_name", "email"],
     });
 
-    // 🧮 Compute completion %
+    // ── Step 3: Cached total count ───────────────────────────────
+    const cacheKey = JSON.stringify({ query, roleId, userRole: user.roleId });
+    const cached = countCache.get(cacheKey);
+    let totalUsers;
+
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      totalUsers = cached.value;
+    } else {
+      totalUsers = await Users.count({
+        where,
+        distinct: true,
+        col: "id",
+        include: includeBase,
+      });
+      countCache.set(cacheKey, { value: totalUsers, timestamp: Date.now() });
+    }
+
+    const pageCount = Math.ceil(totalUsers / limit);
+
+    // ── Compute completion % ───────────────────────────────
     const TOTAL_BASIC_MODULES = 28;
     for (const user of users) {
       const quizScores = user.quizScores || [];
@@ -483,16 +470,19 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
       user.setDataValue("basicCompletionPercent", parseFloat(percent.toFixed(2)));
     }
 
+    // ── Response ───────────────────────────────
     return res.status(200).json({
       users,
       totalUsers,
       page,
       rowsPerPage: limit,
       pageCount,
+      cacheHit: !!cached,
     });
+
   } catch (err) {
     console.error("❌ Error in /search/broad:", err);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
