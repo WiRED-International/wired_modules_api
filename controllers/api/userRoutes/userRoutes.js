@@ -3,7 +3,7 @@ const { Users, Roles, QuizScores, Modules, Countries, Cities, Organizations, Spe
 const auth = require("../../../middleware/auth");
 const isAdmin = require("../../../middleware/isAdmin");
 const { buildUserQueryFilters } = require("../../../middleware/accessControl");
-const { Op } = require("sequelize");
+const { Op, Sequelize } = require("sequelize");
 const ROLES = require("../../../utils/roles")
 
 const sortAscend = 'ASC';
@@ -289,208 +289,199 @@ router.get("/search", auth, isAdmin, async (req, res) => {
 
 //search users by first name, last name, or email with one broad search query
 router.get("/search/broad", auth, isAdmin, async (req, res) => {
-  const { query, rowsPerPage = 10, pageNumber = 1, sortBy, sortOrder, organizationId, countryId, cityId, roleId } = req.query; // The search query
+  const {
+    query,
+    rowsPerPage = 10,
+    pageNumber = 1,
+    sortBy,
+    sortOrder,
+    organizationId,
+    countryId,
+    cityId,
+    roleId,
+  } = req.query;
 
   try {
     const user = req.user;
-
-    // Build all WHERE pieces as ANDed clauses so nothing overwrites anything else.
     const AND = [];
 
-    // ── Admin / Super Admin / User visibility rules ─────────────────────────────
+    // ───────────────────────────────────────────────
+    // 🧩 Role-based visibility control
+    // ───────────────────────────────────────────────
     if (user.roleId === ROLES.ADMIN) {
-      // 1) Org restriction via AdminPermissions
       const adminPermissions = await AdminPermissions.findAll({
         where: { admin_id: user.id },
-        attributes: ['organization_id'],
+        attributes: ["organization_id"],
       });
 
-      const allowedOrgIds = adminPermissions.map(p => p.organization_id).filter(Boolean);
-      console.log("📊 AdminPermissions for admin", user.id, ":", allowedOrgIds);
-
+      const allowedOrgIds = adminPermissions.map((p) => p.organization_id).filter(Boolean);
       if (allowedOrgIds.length === 0) {
-        // No org access → no rows (or return 403)
         return res.status(403).json({ message: "No organization access assigned to this admin." });
       }
+
       AND.push({ organization_id: { [Op.in]: allowedOrgIds } });
-
-      // 2) Role visibility: admins see regular users + themselves (not other admins/super)
       AND.push({
         [Op.or]: [
-          { role_id: ROLES.USER }, // regular users
-          { id: user.id },         // themselves
-        ]
+          { role_id: ROLES.USER },
+          { id: user.id },
+        ],
       });
-
-    } else if (user.roleId === ROLES.SUPER_ADMIN) {
-      // Super admins: full visibility (no org/role restriction)
-      // (Optionally allow query param roleId to filter)
-    } else {
-      // Regular user: only themselves
-      AND.push({ id: user.id });
+    } else if (user.roleId !== ROLES.SUPER_ADMIN) {
+      AND.push({ id: user.id }); // regular user → only themselves
     }
 
-    // ── Free-text search (name/email) ───────────────────────────────────────────
-    if (query && query.trim() !== '') {
-      AND.push({
+    // ───────────────────────────────────────────────
+    // 🧩 Free-text broad search (Users + associations)
+    // ───────────────────────────────────────────────
+    const buildBroadSearch = (term) => {
+      if (!term || !term.trim()) return {};
+      const q = term.trim();
+      return {
         [Op.or]: [
-          { first_name: { [Op.like]: `%${query}%` } },
-          { last_name:  { [Op.like]: `%${query}%` } },
-          { email:      { [Op.like]: `%${query}%` } },
-        ]
-      });
-    }
+          // Base table fields
+          { first_name: { [Op.like]: `%${q}%` } },
+          { last_name:  { [Op.like]: `%${q}%` } },
+          { email:      { [Op.like]: `%${q}%` } },
+          { "$organization.name$": { [Op.like]: `%${q}%` } },
+          { "$role.name$":         { [Op.like]: `%${q}%` } },
+          { "$country.name$":      { [Op.like]: `%${q}%` } },
+          { "$city.name$":         { [Op.like]: `%${q}%` } },
+        ],
+      };
+    };
 
-    // ── Optional explicit role filter from query (super admin only, or keep it for all) ─
-    if (roleId && !isNaN(parseInt(roleId))) {
-      AND.push({ role_id: parseInt(roleId, 10) });
-    }
+    // ───────────────────────────────────────────────
+    // 🧩 Combine filters
+    // ───────────────────────────────────────────────
+    const where = {
+      [Op.and]: [
+        ...AND,
+        buildBroadSearch(query),
+        roleId ? { role_id: parseInt(roleId, 10) } : {},
+      ],
+    };
 
-    const where = AND.length ? { [Op.and]: AND } : {};
-    const limit = parseInt(rowsPerPage, 10) || 10;
-    const page = parseInt(pageNumber, 10) || 1;
+    const limit = parseInt(rowsPerPage, 10);
+    const page = parseInt(pageNumber, 10);
     const offset = (page - 1) * limit;
 
-    console.log("🧭 Final WHERE (broad search):", JSON.stringify(where, null, 2));
+    // ───────────────────────────────────────────────
+    // 🧩 Includes (shared between count + findAll)
+    // ───────────────────────────────────────────────
+    const include = [
+      {
+        model: Organizations,
+        as: "organization",
+        attributes: ["id", "name"],
+        required: false,
+        // where: query ? { name: { [Op.like]: `%${query}%` } } : undefined,
+      },
+      {
+        model: Roles,
+        as: "role",
+        attributes: ["id", "name"],
+        required: false,
+        // where: query ? { name: { [Op.like]: `%${query}%` } } : undefined,
+      },
+      {
+        model: Countries,
+        as: "country",
+        attributes: ["id", "name"],
+        required: false,
+        // where: query ? { name: { [Op.like]: `%${query}%` } } : undefined,
+      },
+      {
+        model: Cities,
+        as: "city",
+        attributes: ["id", "name"],
+        required: false,
+        // where: query ? { name: { [Op.like]: `%${query}%` } } : undefined,
+      },
+      {
+        model: QuizScores,
+        as: "quizScores",
+        attributes: ["score", "date_taken"],
+        include: [
+          { model: Modules, as: "module", attributes: ["id", "name", "module_id", "categories"] },
+        ],
+        required: false,
+      },
+      { model: Specializations, as: "specializations", attributes: ["name"], required: false },
+    ];
 
-    const totalUsers = await Users.count({ where });
+    // ───────────────────────────────────────────────
+    // 🧩 Count total with includes (important!)
+    // ───────────────────────────────────────────────
+    const totalUsers = await Users.count({ where, include });
     const pageCount = Math.ceil(totalUsers / limit);
 
-//     const users = await Users.findAll({
-//       where,
-//       attributes: ["id", "first_name", "last_name", "email"],
-//       include: [
-//         { model: Organizations, as: "organization", attributes: ["name", "id"], required: false },
-//         { model: Roles,         as: "role",         attributes: ["name", "id"] },
-//         { model: Countries,     as: "country",      attributes: ["name", "id"], required: false },
-//         { model: Cities,        as: "city",         attributes: ["name"],        required: false },
-//         {
-//           model: QuizScores, as: "quizScores", attributes: ["score", "date_taken"],
-//           include: [{ model: Modules, as: "module", attributes: ["name", "module_id"] }],
-//           required: false,
-//         },
-//         { model: Specializations, as: 'specializations', attributes: ['name'], required: false },
-//       ],
-//       // (You’re sorting client-side; keep as-is, or add order/limit/offset here)
-//     });
-
-//     // 🧮 Sort results before pagination
-//     if (sortBy) {
-//       const direction = (sortOrder && sortOrder.toUpperCase() === 'DESC') ? -1 : 1;
-
-//       users.sort((a, b) => {
-//         const valA =
-//           sortBy === 'organization' ? a.organization?.name ?? '' :
-//           sortBy === 'role'         ? a.role?.name ?? '' :
-//           sortBy === 'country'      ? a.country?.name ?? '' :
-//           sortBy === 'city'         ? a.city?.name ?? '' :
-//           (a[sortBy] ?? '');
-
-//         const valB =
-//           sortBy === 'organization' ? b.organization?.name ?? '' :
-//           sortBy === 'role'         ? b.role?.name ?? '' :
-//           sortBy === 'country'      ? b.country?.name ?? '' :
-//           sortBy === 'city'         ? b.city?.name ?? '' :
-//           (b[sortBy] ?? '');
-
-//         return valA.toString().localeCompare(valB.toString(), undefined, { sensitivity: 'base' }) * direction;
-//       });
-//     } else {
-//       // Default sort by last_name ASC
-//       users.sort((a, b) =>
-//         a.last_name.localeCompare(b.last_name, undefined, { sensitivity: 'base' })
-//       );
-//     }
-
-//     // client-side sort + pagination (your existing code)
-//     // ... keep your sort code ...
-//     const start = offset;
-//     const end = offset + limit;
-//     const paginatedUsers = users.slice(start, end);
-
-//     return res.status(200).json({ users: paginatedUsers, totalUsers, page, rowsPerPage: limit, pageCount });
-//   } catch (err) {
-//     console.error(err);
-//     return res.status(500).json({ message: err.message });
-//   }
-// });
-
-// ── SQL-level sorting ───────────────────────────────────────────────────────
+    // ───────────────────────────────────────────────
+    // 🧩 Sorting (base + joined tables, fixed)
+    // ───────────────────────────────────────────────
     const order = [];
-    if (sortBy) {
-      const direction = sortOrder?.toUpperCase() === "DESC" ? "DESC" : "ASC";
-      switch (sortBy) {
-        case "organization":
-        case "organization.name":
-          order.push([{ model: Organizations, as: "organization" }, "name", direction]);
-          break;
-        case "role":
-        case "role.name":
-          order.push([{ model: Roles, as: "role" }, "name", direction]);
-          break;
-        case "country":
-        case "country.name":
-          order.push([{ model: Countries, as: "country" }, "name", direction]);
-          break;
-        case "city":
-        case "city.name":
-          order.push([{ model: Cities, as: "city" }, "name", direction]);
-          break;
-        default:
-          order.push([sortBy, direction]);
-      }
-    } else {
-      order.push(["last_name", "ASC"]);
+    const direction = sortOrder?.toUpperCase() === "DESC" ? "DESC" : "ASC";
+
+    switch (sortBy) {
+      case "organization":
+      case "organization.name":
+        include.find(i => i.as === "organization").required = true;
+        order.push([{ model: Organizations, as: "organization" }, "name", direction]);
+        break;
+
+      case "role":
+      case "role.name":
+        include.find(i => i.as === "role").required = true;
+        order.push([{ model: Roles, as: "role" }, "name", direction]);
+        break;
+
+      case "country":
+      case "country.name":
+        include.find(i => i.as === "country").required = true;
+        order.push([{ model: Countries, as: "country" }, "name", direction]);
+        break;
+
+      case "city":
+      case "city.name":
+        include.find(i => i.as === "city").required = true;
+        order.push([{ model: Cities, as: "city" }, "name", direction]);
+        break;
+
+      case "email":
+      case "first_name":
+      case "last_name":
+        order.push([sortBy, direction]);
+        break;
+
+      default:
+        order.push(["last_name", "ASC"]);
     }
 
-    // ── Query users ────────────────────────────────────────────────────────────
+    // ───────────────────────────────────────────────
+    // 🧩 Fetch paginated results
+    // ───────────────────────────────────────────────
     const users = await Users.findAll({
       where,
-      attributes: ["id", "first_name", "last_name", "email"],
-      include: [
-        { model: Organizations, as: "organization", attributes: ["name", "id"], required: false },
-        { model: Roles, as: "role", attributes: ["name", "id"] },
-        { model: Countries, as: "country", attributes: ["name", "id"], required: false },
-        { model: Cities, as: "city", attributes: ["name"], required: false },
-        {
-          model: QuizScores,
-          as: "quizScores",
-          attributes: ["score", "date_taken"],
-          include: [
-            {
-              model: Modules,
-              as: "module",
-              attributes: ["id", "name", "module_id", "categories"],
-            },
-          ],
-          required: false,
-        },
-        { model: Specializations, as: "specializations", attributes: ["name"], required: false },
-      ],
+      include,
       order,
       limit,
       offset,
+      subQuery: false,
+      attributes: ["id", "first_name", "last_name", "email"],
     });
 
-    // 🔹 Compute basic module completion for each user
+    // 🧮 Compute completion %
     const TOTAL_BASIC_MODULES = 28;
     for (const user of users) {
       const quizScores = user.quizScores || [];
-      
-      // Count "basic" modules with score >= 80
-      const completedBasics = quizScores.filter(qs =>
-        qs.score >= 80 &&
-        Array.isArray(qs.module?.categories) &&
-        qs.module.categories.includes('basic')
+      const completedBasics = quizScores.filter(
+        (qs) =>
+          qs.score >= 80 &&
+          Array.isArray(qs.module?.categories) &&
+          qs.module.categories.includes("basic")
       ).length;
-
-      const percent = TOTAL_BASIC_MODULES > 0
-        ? (completedBasics / TOTAL_BASIC_MODULES) * 100
-        : 0;
-
-      // Attach field to each user for frontend display
-      user.setDataValue('basicCompletionPercent', parseFloat(percent.toFixed(2)));
-    };
+      const percent = TOTAL_BASIC_MODULES > 0 ? (completedBasics / TOTAL_BASIC_MODULES) * 100 : 0;
+      user.setDataValue("basicCompletionPercent", parseFloat(percent.toFixed(2)));
+    }
 
     return res.status(200).json({
       users,
@@ -500,7 +491,7 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
       pageCount,
     });
   } catch (err) {
-    console.error(err);
+    console.error("❌ Error in /search/broad:", err);
     return res.status(500).json({ message: err.message });
   }
 });
