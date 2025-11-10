@@ -21,31 +21,74 @@ router.get('/', auth, isAdmin, async (req, res) => {
   }
 });
 
-// 🧠 Add questions to an existing exam
-router.post('/:examId/questions', auth, isAdmin, async (req, res) => {
-  const { examId } = req.params;
+// 🧠 Add questions to an existing exam (the :id is exam id)
+router.post('/:id/questions', auth, isAdmin, async (req, res) => {
+  const { id } = req.params;
   const { questions } = req.body;
 
-  if (!Array.isArray(questions) || questions.length === 0) {
-    return res.status(400).json({ message: 'Questions array is required.' });
-  }
-
   try {
-    const created = await Promise.all(
-      questions.map(q =>
-        ExamQuestions.create({
-          exam_id: examId,
-          question_text: q.question_text,
-          options: q.options,
-          correct_answer: q.correct_answer,
-        })
-      )
-    );
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ message: 'Questions array is required' });
+    }
 
-    res.status(201).json({ message: 'Questions added successfully.', created });
-  } catch (err) {
-    console.error('❌ Failed to add questions:', err);
-    res.status(500).json({ message: 'Failed to add questions', error: err.message });
+    // 🧩 Normalize & validate data for each question
+    console.log('🧭 Route params:', req.params);
+    const formattedQuestions = questions.map((q, index) => {
+      // Ensure correct_answers is always an array
+      let correctAnswers = [];
+      if (Array.isArray(q.correct_answers)) {
+        correctAnswers = q.correct_answers;
+      } else if (Array.isArray(q.correct_answer)) {
+        correctAnswers = q.correct_answer;
+      } else if (typeof q.correct_answers === 'string') {
+        // handle accidentally stringified JSON
+        try {
+          correctAnswers = JSON.parse(q.correct_answers);
+        } catch {
+          correctAnswers = [];
+        }
+      }
+
+      return {
+        exam_id: id,
+        question_type: q.question_type || 'single',
+        question_text: q.question_text?.trim(),
+        options: q.options || {},
+        correct_answers: correctAnswers, // ✅ always stored as array
+        order: q.order ?? index + 1, // fallback order if missing
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+    });
+
+    // 🧠 Validate required fields
+    for (const fq of formattedQuestions) {
+      if (!fq.question_text || !Object.keys(fq.options).length) {
+        return res.status(400).json({
+          message: 'Each question must include both question_text and at least one option',
+        });
+      }
+      if (!Array.isArray(fq.correct_answers)) {
+        return res.status(400).json({
+          message: 'correct_answers must be an array',
+        });
+      }
+    }
+
+    // 🧮 Bulk insert all questions at once
+    console.log('🧪 First formatted question:', formattedQuestions[0]);
+    const created = await ExamQuestions.bulkCreate(formattedQuestions);
+
+    res.status(201).json({
+      message: '✅ Questions added successfully',
+      count: created.length,
+    });
+  } catch (error) {
+    console.error('❌ Failed to add questions:', error);
+    res.status(500).json({
+      message: 'Failed to add questions',
+      error: error.message,
+    });
   }
 });
 

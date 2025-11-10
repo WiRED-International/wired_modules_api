@@ -84,8 +84,31 @@ router.put('/:id/submit', auth, async (req, res) => {
       return res.status(400).json({ message: 'Answers missing or invalid format' });
     }
 
-    // 6️⃣ Calculate score
-    const { score, correctCount, total } = await calculateScore(answers, session.exam_id);
+    // ✅ 6️⃣ Normalize answers for both single and multiple formats
+    console.log('🧾 Raw answers from client:', JSON.stringify(answers, null, 2));
+
+    const normalizedAnswers = answers.map((a) => {
+      const selected = Array.isArray(a.selected_option_ids)
+        ? a.selected_option_ids
+        : Array.isArray(a.selected_options)
+        ? a.selected_options
+        : a.selected_option
+        ? [a.selected_option]
+        : a.selected_option_id
+        ? [a.selected_option_id]
+        : [];
+
+      return {
+        question_id: a.question_id,
+        selected_option_ids: selected, // unified format for backend grading
+        updated_at: a.updated_at || new Date().toISOString(),
+      };
+    });
+
+    console.log('🧠 Normalized answers:', JSON.stringify(normalizedAnswers, null, 2));
+
+    // ✅ 7️⃣ Calculate score with normalized answers
+    const { score, correctCount, total } = await calculateScore(normalizedAnswers, session.exam_id);
 
     // 7️⃣ Update the session
     await session.update({
@@ -130,7 +153,7 @@ router.get('/exam-sessions/:id/details', auth, isAdmin, async (req, res) => {
 
     const questions = await ExamQuestions.findAll({
       where: { exam_id: session.exam_id },
-      attributes: ['id', 'question_text', 'options', 'correct_answer'],
+      attributes: ['id', 'question_text', 'options', 'correct_answers'],
       order: [['id', 'ASC']]
     });
 
@@ -138,7 +161,7 @@ router.get('/exam-sessions/:id/details', auth, isAdmin, async (req, res) => {
       question_id: q.id,
       question_text: q.question_text,
       options: q.options,
-      correct_answer: q.correct_answer,
+      correct_answers: q.correct_answers,
       user_answer: session.answers?.[q.id] || null
     }));
 

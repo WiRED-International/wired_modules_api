@@ -17,7 +17,8 @@ ExamQuestions.init(
         model: 'exams',
         key: 'id'
       },
-      onDelete: 'CASCADE'
+      onDelete: 'CASCADE',
+      field: "exam_id"
     },
     question_type: {
       type: DataTypes.STRING,
@@ -36,7 +37,8 @@ ExamQuestions.init(
     correct_answers: {
       type: DataTypes.JSON,
       allowNull: false,
-      defaultValue: [] 
+      defaultValue: [],
+      field: 'correct_answers',
       // Example: ["a", "c", "d", "e"]
     },
     order: {

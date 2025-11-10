@@ -40,6 +40,46 @@ router.get('/available', auth, async (req, res) => {
   }
 });
 
+// 👤 GET /exams/assigned (list all exams assigned to the current user)
+router.get('/assigned', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const assignedExams = await ExamUserAccess.findAll({
+      where: { user_id: userId },
+      include: [
+        {
+          model: Exams,
+          as: 'exams',
+          attributes: [
+            'id',
+            'title',
+            'available_from',
+            'available_until',
+            'duration_minutes',
+          ],
+        },
+      ],
+      order: [['created_at', 'DESC']],
+    });
+
+    // Format the response cleanly
+    const result = assignedExams.map(a => ({
+      exam_id: a.exam_id,
+      title: a.exams?.title,
+      available_from: a.exams?.available_from,
+      available_until: a.exams?.available_until,
+      duration_minutes: a.exams?.duration_minutes,
+      max_attempts: a.max_attempts,
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error('❌ Error fetching assigned exams:', err);
+    res.status(500).json({ message: 'Failed to fetch assigned exams', error: err.message });
+  }
+});
+
 // GET /exams/:id - Get exam metadata
 router.get('/:id', auth, async (req, res) => {
   try {
@@ -84,7 +124,7 @@ router.post('/:id/start-session', auth, async (req, res) => {
         { 
           model: ExamQuestions, 
           as: 'exam_questions', 
-          attributes: ['id', 'question_text', 'options', 'correct_answers'] 
+          attributes: ['id', 'question_type', 'question_text', 'options', 'correct_answers'] 
         },
       ],
     });
@@ -152,6 +192,11 @@ router.post('/:id/start-session', auth, async (req, res) => {
       attributes: ['id', 'question_text', 'options'],
       order: [['id', 'ASC']]
     });
+
+    console.log(
+      "🧩 Sending questions to client:",
+      exam.exam_questions.map(q => ({ id: q.id, type: q.question_type }))
+    );
 
     res.status(201).json({
       session_id: session.id,
