@@ -5,167 +5,168 @@ const isAdmin = require("../../../middleware/isAdmin");
 const { buildUserQueryFilters } = require("../../../middleware/accessControl");
 const { Op, Sequelize } = require("sequelize");
 const ROLES = require("../../../utils/roles")
+const { calculateCmeCredits } = require('../../../utils/calculateCmeCredits');
 
 const sortAscend = 'ASC';
 const sortDescend = 'DESC';
 
 //this route is actually no longer beings used by the admin dashboard, but I am leaving it here in case it is being used elsewhere
-router.get("/", auth, isAdmin, async (req, res) => {
-  const { countryId, cityId, organizationId, roleId, sortBy, sortOrder = sortAscend, rowsPerPage = 10, pageNumber = 1 } = req.query;
-  const allowedSortFields = [
-    "actions",
-    "first_name",
-    "last_name",
-    "email",
-    "CME_Credits",
-    "remainingCredits",
-    "specializations",
-    "role",
-    "country",
-    "city",
-    "organization"
-  ]
+// router.get("/", auth, isAdmin, async (req, res) => {
+//   const { countryId, cityId, organizationId, roleId, sortBy, sortOrder = sortAscend, rowsPerPage = 10, pageNumber = 1 } = req.query;
+//   const allowedSortFields = [
+//     "actions",
+//     "first_name",
+//     "last_name",
+//     "email",
+//     "CME_Credits",
+//     "remainingCredits",
+//     "specializations",
+//     "role",
+//     "country",
+//     "city",
+//     "organization"
+//   ]
   
-  try {
-    const user = req.user;
-    let where = buildUserQueryFilters(req, { countryId, cityId, organizationId, roleId, sortBy, sortOrder, rowsPerPage, pageNumber });
+//   try {
+//     const user = req.user;
+//     let where = buildUserQueryFilters(req, { countryId, cityId, organizationId, roleId, sortBy, sortOrder, rowsPerPage, pageNumber });
 
-    // 🧹 Clean up undefined filters before use
-    Object.keys(where).forEach((key) => {
-      if (where[key] === undefined) delete where[key];
-    });
+//     // 🧹 Clean up undefined filters before use
+//     Object.keys(where).forEach((key) => {
+//       if (where[key] === undefined) delete where[key];
+//     });
 
-        // 🧩 Super Admin → Full access (no restriction)
-    if (user.roleId === ROLES.SUPER_ADMIN) {
-      // no change needed, full access
-    }
-    // 🧩 Admin → Only users from allowed organizations
-    else if (user.roleId === ROLES.ADMIN) {
-      // Find all organizations the admin can access
-      console.log("👤 Logged-in user:", user);
-      const adminPermissions = await AdminPermissions.findAll({
-        where: { admin_id: user.id },
-        attributes: ['organization_id']
-      });
-      console.log("📊 AdminPermissions found:", adminPermissions.map(p => p.organization_id));
-      console.log("✅ AdminPermissions for admin", user.id, ":", adminPermissions.map(p => p.organization_id));
-      const allowedOrgIds = adminPermissions.map(p => p.organization_id).filter(Boolean);
+//         // 🧩 Super Admin → Full access (no restriction)
+//     if (user.roleId === ROLES.SUPER_ADMIN) {
+//       // no change needed, full access
+//     }
+//     // 🧩 Admin → Only users from allowed organizations
+//     else if (user.roleId === ROLES.ADMIN) {
+//       // Find all organizations the admin can access
+//       console.log("👤 Logged-in user:", user);
+//       const adminPermissions = await AdminPermissions.findAll({
+//         where: { admin_id: user.id },
+//         attributes: ['organization_id']
+//       });
+//       console.log("📊 AdminPermissions found:", adminPermissions.map(p => p.organization_id));
+//       console.log("✅ AdminPermissions for admin", user.id, ":", adminPermissions.map(p => p.organization_id));
+//       const allowedOrgIds = adminPermissions.map(p => p.organization_id).filter(Boolean);
 
-      if (allowedOrgIds.length === 0) {
-        return res.status(403).json({ message: "No organization access assigned to this admin." });
-      }
+//       if (allowedOrgIds.length === 0) {
+//         return res.status(403).json({ message: "No organization access assigned to this admin." });
+//       }
 
-      // Limit users to those organizations
-      // where = {
-      //   ...where,
-      //   organization_id: { [Op.in]: allowedOrgIds }
-      // };
-      if (allowedOrgIds.length > 0) {
-        where.organization_id = { [Op.in]: allowedOrgIds };
-      } else {
-        console.warn(`⚠️ Admin ${user.id} has no assigned organizations — returning no users.`);
-        where.organization_id = { [Op.in]: [] };
-      }
-    } 
-    // 🧩 Regular user → Only themselves
-    else {
-      where = { id: user.id };
-    }
+//       // Limit users to those organizations
+//       // where = {
+//       //   ...where,
+//       //   organization_id: { [Op.in]: allowedOrgIds }
+//       // };
+//       if (allowedOrgIds.length > 0) {
+//         where.organization_id = { [Op.in]: allowedOrgIds };
+//       } else {
+//         console.warn(`⚠️ Admin ${user.id} has no assigned organizations — returning no users.`);
+//         where.organization_id = { [Op.in]: [] };
+//       }
+//     } 
+//     // 🧩 Regular user → Only themselves
+//     else {
+//       where = { id: user.id };
+//     }
 
-    const order = [];
-    if (sortBy) {
+//     const order = [];
+//     if (sortBy) {
 
-      const safeSortBy = allowedSortFields.includes(sortBy)
-        ? sortBy
-        : 'last_name'; // Default to last_name if sortBy is not allowed
+//       const safeSortBy = allowedSortFields.includes(sortBy)
+//         ? sortBy
+//         : 'last_name'; // Default to last_name if sortBy is not allowed
 
-      const safeSortOrder = sortOrder?.toUpperCase() === sortAscend ? sortAscend : sortDescend;
-      switch (safeSortBy) {
-        case 'organization':
-          order.push([{ model: Organizations, as: 'organization' }, 'name', safeSortOrder]);
-          break;
+//       const safeSortOrder = sortOrder?.toUpperCase() === sortAscend ? sortAscend : sortDescend;
+//       switch (safeSortBy) {
+//         case 'organization':
+//           order.push([{ model: Organizations, as: 'organization' }, 'name', safeSortOrder]);
+//           break;
 
-        case 'role':
-          order.push([{ model: Roles, as: 'role' }, 'name', safeSortOrder]);
-          break;
+//         case 'role':
+//           order.push([{ model: Roles, as: 'role' }, 'name', safeSortOrder]);
+//           break;
 
-        case 'country':
-          order.push([{ model: Countries, as: 'country' }, 'name', safeSortOrder]);
-          break;
+//         case 'country':
+//           order.push([{ model: Countries, as: 'country' }, 'name', safeSortOrder]);
+//           break;
 
-        case 'city':
-          order.push([{ model: Cities, as: 'city' }, 'name', safeSortOrder]);
-          break;
+//         case 'city':
+//           order.push([{ model: Cities, as: 'city' }, 'name', safeSortOrder]);
+//           break;
 
-        case 'specializations':
-          // Always ASC for alphabetic sorting of first specialization
-          order.push([{ model: Specializations, as: 'specializations' }, 'name', sortAscend]);
-          break;
+//         case 'specializations':
+//           // Always ASC for alphabetic sorting of first specialization
+//           order.push([{ model: Specializations, as: 'specializations' }, 'name', sortAscend]);
+//           break;
 
-        default:
-          // Sorting by field on Users table
-          order.push([safeSortBy, safeSortOrder]);
-      }
-    }
+//         default:
+//           // Sorting by field on Users table
+//           order.push([safeSortBy, safeSortOrder]);
+//       }
+//     }
 
-    const limit = parseInt(rowsPerPage, 10) || 10;
-    const offset = ((parseInt(pageNumber, 10) || 1) - 1) * limit;
+//     const limit = parseInt(rowsPerPage, 10) || 10;
+//     const offset = ((parseInt(pageNumber, 10) || 1) - 1) * limit;
 
 
 
-    const users = await Users.findAll({
-      where,
-      attributes: ["id", "first_name", "last_name", "email",],
-      include: [
-        {
-          model: Organizations,
-          as: "organization",
-          attributes: ["name", "id"],
-        },
-        {
-          model: Roles,
-          as: "role",
-          attributes: ["name", "id"],
-        },
-        {
-          model: Countries,
-          as: "country",
-          attributes: ["name", "id"],
-        },
-        {
-          model: Cities,
-          as: "city",
-          attributes: ["name", "id"],
-        },
-        {
-          model: QuizScores,
-          as: 'quizScores',
-          attributes: ['score', 'date_taken'],
-          include: [
-            {
-              model: Modules,
-              as: 'module',
-              attributes: ['name', 'module_id',],
-            },
-          ],
-        },
-        {
-          model: Specializations,
-          as: 'specializations',
-          attributes: ['name', 'id'],
-        }
-      ],
-      order: order.length > 0 ? order : [['last_name', sortAscend]], // Default sort by last_name if no sortBy provided
-      limit,
-      offset,
-    });
+//     const users = await Users.findAll({
+//       where,
+//       attributes: ["id", "first_name", "last_name", "email",],
+//       include: [
+//         {
+//           model: Organizations,
+//           as: "organization",
+//           attributes: ["name", "id"],
+//         },
+//         {
+//           model: Roles,
+//           as: "role",
+//           attributes: ["name", "id"],
+//         },
+//         {
+//           model: Countries,
+//           as: "country",
+//           attributes: ["name", "id"],
+//         },
+//         {
+//           model: Cities,
+//           as: "city",
+//           attributes: ["name", "id"],
+//         },
+//         {
+//           model: QuizScores,
+//           as: 'quizScores',
+//           attributes: ['score', 'date_taken'],
+//           include: [
+//             {
+//               model: Modules,
+//               as: 'module',
+//               attributes: ['name', 'module_id',],
+//             },
+//           ],
+//         },
+//         {
+//           model: Specializations,
+//           as: 'specializations',
+//           attributes: ['name', 'id'],
+//         }
+//       ],
+//       order: order.length > 0 ? order : [['last_name', sortAscend]], // Default sort by last_name if no sortBy provided
+//       limit,
+//       offset,
+//     });
 
-    return res.status(200).json(users);
-  } catch (err) {
-    console.error(err);
-    return res.status(403).json({ message: err.message });
-  }
-});
+//     return res.status(200).json(users);
+//   } catch (err) {
+//     console.error(err);
+//     return res.status(403).json({ message: err.message });
+//   }
+// });
 
 
 router.get('/me', auth, async (req, res) => {
@@ -383,6 +384,8 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
       case "city.name":
         order.push([{ model: Cities, as: "city" }, "name", direction]);
         break;
+      case "CME_Credits":
+        break;
       case "email":
       case "first_name":
       case "last_name":
@@ -426,7 +429,7 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
           as: "quizScores",
           attributes: ["score", "date_taken"],
           include: [
-            { model: Modules, as: "module", attributes: ["id", "name", "module_id", "categories"] },
+            { model: Modules, as: "module", attributes: ["id", "name", "module_id", "credit_type", "categories"] },
           ],
           required: false,
         },
@@ -437,7 +440,48 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
       attributes: ["id", "first_name", "last_name", "email"],
     });
 
-    // ── Step 3: Cached total count ───────────────────────────────
+    // ── Step 3: Compute derived fields ───────────────────────────────
+    const TOTAL_BASIC_MODULES = 28;
+    const currentYear = new Date().getFullYear();
+
+    for (const user of users) {
+      const quizScores = user.quizScores || [];
+
+      // ✅ Basic Training completion percent
+      const completedBasics = quizScores.filter(
+        (qs) =>
+          qs.score >= 80 &&
+          Array.isArray(qs.module?.categories) &&
+          qs.module.categories.includes("basic")
+      ).length;
+      const percent =
+        TOTAL_BASIC_MODULES > 0
+          ? (completedBasics / TOTAL_BASIC_MODULES) * 100
+          : 0;
+      user.setDataValue(
+        "basicCompletionPercent",
+        parseFloat(percent.toFixed(2))
+      );
+
+      
+
+      // ✅ CME credits (calculated once and attached to the model)
+      const cmeCredits = calculateCmeCredits(quizScores, currentYear);
+      user.setDataValue("CME_Credits", cmeCredits);
+    }
+
+    // ── Step 4: Sort by CME_Credits if requested ─────────────────────
+    if (sortBy === "CME_Credits") {
+      users.sort((a, b) => {
+        const aCredits = a.getDataValue("CME_Credits") || 0;
+        const bCredits = b.getDataValue("CME_Credits") || 0;
+        return sortOrder.toUpperCase() === "DESC"
+          ? bCredits - aCredits
+          : aCredits - bCredits;
+      });
+    }
+
+    // ── Step 5: Cached total count ───────────────────────────────
     const cacheKey = JSON.stringify({ query, roleId, userRole: user.roleId });
     const cached = countCache.get(cacheKey);
     let totalUsers;
@@ -445,30 +489,11 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
       totalUsers = cached.value;
     } else {
-      totalUsers = await Users.count({
-        where,
-        distinct: true,
-        col: "id",
-        include: includeBase,
-      });
+      totalUsers = await Users.count({ where, distinct: true, col: "id", include: includeBase });
       countCache.set(cacheKey, { value: totalUsers, timestamp: Date.now() });
     }
 
     const pageCount = Math.ceil(totalUsers / limit);
-
-    // ── Compute completion % ───────────────────────────────
-    const TOTAL_BASIC_MODULES = 28;
-    for (const user of users) {
-      const quizScores = user.quizScores || [];
-      const completedBasics = quizScores.filter(
-        (qs) =>
-          qs.score >= 80 &&
-          Array.isArray(qs.module?.categories) &&
-          qs.module.categories.includes("basic")
-      ).length;
-      const percent = TOTAL_BASIC_MODULES > 0 ? (completedBasics / TOTAL_BASIC_MODULES) * 100 : 0;
-      user.setDataValue("basicCompletionPercent", parseFloat(percent.toFixed(2)));
-    }
 
     // ── Response ───────────────────────────────
     return res.status(200).json({

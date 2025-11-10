@@ -13,28 +13,61 @@ router.post('/exams/:id/questions', auth, async (req, res) => {
       return res.status(400).json({ message: 'Questions array is required' });
     }
 
-    // 🧩 Normalize data so Sequelize never gets null fields
-    const formattedQuestions = questions.map(q => ({
-      exam_id: id,
-      question_type: q.question_type || 'single',
-      question_text: q.question_text,
-      options: q.options,
-      correct_answers: q.correct_answers || q.correct_answer || [], // ✅ handle both names
-      order: q.order || null,
-    }));
+    const formattedQuestions = questions.map((q, index) => {
+      let correctAnswers = [];
 
-    // 🧠 Validate fields before insert
+      if (Array.isArray(q.correct_answers)) {
+        correctAnswers = q.correct_answers;
+      } else if (Array.isArray(q.correct_answer)) {
+        correctAnswers = q.correct_answer;
+      } else if (typeof q.correct_answers === 'string') {
+        try {
+          correctAnswers = JSON.parse(q.correct_answers);
+        } catch {
+          correctAnswers = [];
+        }
+      }
+
+      return {
+        exam_id: Number(id),
+        question_type: q.question_type || 'single',
+        question_text: q.question_text?.trim(),
+        options: q.options || {},
+        correct_answers: correctAnswers,  // ✅ store JSON array
+        order: q.order ?? index + 1,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+    });
+
+    // 🧩 Debugging output
+    console.log('\n🧪 [DEBUG] First formatted question:');
+    console.dir(formattedQuestions[0], { depth: null });
+
+    // Validate fields
     for (const fq of formattedQuestions) {
-      if (!fq.question_text || !fq.options) {
-        return res.status(400).json({ message: 'Each question must include question_text and options' });
+      if (!fq.question_text || !Object.keys(fq.options).length) {
+        return res.status(400).json({
+          message: 'Each question must include both question_text and at least one option',
+        });
+      }
+      if (!Array.isArray(fq.correct_answers)) {
+        return res.status(400).json({
+          message: 'correct_answers must be an array',
+        });
       }
     }
 
-    // 🧮 Bulk insert all questions at once
+    // 🧮 Bulk insert
     const created = await ExamQuestions.bulkCreate(formattedQuestions);
+    console.log(`✅ [DEBUG] Created ${created.length} questions`);
+
+    // Fetch one back to confirm what got stored
+    const check = await ExamQuestions.findOne({ where: { exam_id: id } });
+    console.log('🧩 [DEBUG] DB stored sample:', check?.toJSON());
 
     res.status(201).json({
-      message: 'Questions added successfully',
+      message: '✅ Questions added successfully',
       count: created.length,
     });
   } catch (error) {

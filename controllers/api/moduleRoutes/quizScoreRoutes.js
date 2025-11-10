@@ -57,6 +57,8 @@ router.get('/', auth, async (req, res) => {
         ]
       });
     }
+    console.log("🧠 First quiz score:", quizScores[0]?.module_id);
+    console.log("🧩 Joined module:", quizScores[0]?.module);
     res.status(200).json(quizScores);
   } catch (err) {
     console.error('Error creating QuizScores:', err);
