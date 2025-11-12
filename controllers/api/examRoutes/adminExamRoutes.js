@@ -92,6 +92,136 @@ router.post('/:id/questions', auth, isAdmin, async (req, res) => {
   }
 });
 
+// 🔁 PUT /admin/exams/:id/questions
+// Updates existing questions (with `id`) and adds new ones (without `id`)
+router.put('/:id/questions', auth, isAdmin, async (req, res) => {
+  const { id } = req.params; // exam_id
+  const { questions } = req.body;
+
+  try {
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ message: 'Questions array is required' });
+    }
+
+    const updates = [];
+    const newQuestions = [];
+
+    for (const [index, q] of questions.entries()) {
+      // Normalize correct_answers input
+      let correctAnswers = [];
+      if (Array.isArray(q.correct_answers)) {
+        correctAnswers = q.correct_answers;
+      } else if (typeof q.correct_answers === 'string') {
+        try {
+          correctAnswers = JSON.parse(q.correct_answers);
+        } catch {
+          correctAnswers = [];
+        }
+      }
+
+      // ✅ Case 1: Update existing (has ID)
+      if (q.id) {
+        const question = await ExamQuestions.findOne({
+          where: { id: q.id, exam_id: id },
+        });
+
+        if (!question) {
+          console.warn(`⚠️ Question ID ${q.id} not found for exam ${id}, skipping update.`);
+          continue;
+        }
+
+        await question.update({
+          question_type: q.question_type ?? question.question_type,
+          question_text: q.question_text?.trim() ?? question.question_text,
+          options: q.options ?? question.options,
+          correct_answers:
+            correctAnswers.length > 0 ? correctAnswers : question.correct_answers,
+          order: q.order ?? question.order,
+          updated_at: new Date(),
+        });
+
+        updates.push(question);
+      }
+
+      // ✅ Case 2: Add new (no ID)
+      else {
+        if (!q.question_text || !q.options) {
+          console.warn(`⚠️ Skipping question at index ${index}: missing question_text or options.`);
+          continue;
+        }
+
+        const newQ = {
+          exam_id: Number(id),
+          question_type: q.question_type || 'single',
+          question_text: q.question_text.trim(),
+          options: q.options,
+          correct_answers: correctAnswers,
+          order: q.order ?? index + 1,
+          created_at: new Date(),
+          updated_at: new Date(),
+        };
+        newQuestions.push(newQ);
+      }
+    }
+
+    // 🧮 Bulk insert new questions if any
+    let created = [];
+    if (newQuestions.length > 0) {
+      created = await ExamQuestions.bulkCreate(newQuestions);
+      console.log(`🆕 Added ${created.length} new questions`);
+    }
+
+    res.status(200).json({
+      message: `✅ Successfully updated ${updates.length} and added ${created.length} question(s).`,
+      updatedCount: updates.length,
+      addedCount: created.length,
+    });
+  } catch (error) {
+    console.error('❌ Failed to update/add questions:', error);
+    res.status(500).json({
+      message: 'Failed to update/add exam questions',
+      error: error.message,
+    });
+  }
+});
+
+// 📋 GET /admin/exams/:id/questions - Fetch all questions for a given exam
+router.get('/:id/questions', auth, isAdmin, async (req, res) => {
+  const { id } = req.params;
+  const includeAnswers = req.query.includeAnswers === 'true';
+  const userRole = req.user?.roleId;
+
+  try {
+    const canViewAnswers = includeAnswers && (userRole === 2 || userRole === 3); 
+    // Assuming roleId 2=Admin, 3=Super Admin
+
+    const questions = await ExamQuestions.findAll({
+      where: { exam_id: id },
+      order: [['order', 'ASC']],
+      attributes: canViewAnswers
+        ? undefined
+        : { exclude: ['correct_answers'] },
+    });
+
+    if (!questions || questions.length === 0) {
+      return res.status(404).json({ message: `No questions found for exam ID ${id}` });
+    }
+
+    res.status(200).json({
+      message: `✅ Retrieved ${questions.length} question(s) for exam ${id}`,
+      count: questions.length,
+      includeAnswers: canViewAnswers,
+      questions,
+    });
+  } catch (error) {
+    console.error('❌ Failed to fetch questions:', error);
+    res.status(500).json({
+      message: 'Failed to fetch exam questions',
+      error: error.message,
+    });
+  }
+});
+
 /**
  * 🧩 POST /api/admin/exams
  * Create a new exam
