@@ -3,6 +3,7 @@ const router = express.Router();
 const { Exams, ExamSessions, ExamUserAccess, Users, ExamQuestions } = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require('../../../middleware/isAdmin');
+const { localToUtcISO, DEFAULT_EXAM_TIME_ZONE } = require("../../../utils/timezoneUtils");
 
 /**
  * 📋 GET /api/admin/exams
@@ -228,11 +229,51 @@ router.get('/:id/questions', auth, isAdmin, async (req, res) => {
  */
 router.post('/', auth, isAdmin, async (req, res) => {
   try {
-    const exam = await Exams.create(req.body);
-    res.status(201).json(exam);
+    const {
+      title,
+      description,
+      localStart,
+      localEnd,
+      timeZone,
+      duration_minutes
+    } = req.body;
+
+    if (!localStart || !localEnd) {
+      return res.status(400).json({
+        message: "localStart and localEnd are required (local date/time)"
+      });
+    }
+
+    // Use provided timezone or default
+    const zone = timeZone || DEFAULT_EXAM_TIME_ZONE;
+
+    // Convert local times to UTC ISO
+    const startUTC = localToUtcISO(localStart, zone);
+    const endUTC = localToUtcISO(localEnd, zone);
+
+    const exam = await Exams.create({
+      title,
+      description,
+      available_from: startUTC,
+      available_until: endUTC,
+      duration_minutes
+    });
+
+    res.status(201).json({
+      message: "Exam created successfully (UTC normalized).",
+      savedUTC: {
+        available_from: startUTC,
+        available_until: endUTC
+      },
+      exam
+    });
+
   } catch (err) {
     console.error('❌ Failed to create exam:', err);
-    res.status(500).json({ message: 'Failed to create exam', error: err.message });
+    res.status(500).json({
+      message: 'Failed to create exam',
+      error: err.message
+    });
   }
 });
 
