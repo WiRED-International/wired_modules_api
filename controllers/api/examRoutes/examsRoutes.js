@@ -45,7 +45,7 @@ router.get('/assigned', auth, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const assignedExams = await ExamUserAccess.findAll({
+    const assigned = await ExamUserAccess.findOne({
       where: { user_id: userId },
       include: [
         {
@@ -54,29 +54,60 @@ router.get('/assigned', auth, async (req, res) => {
           attributes: [
             'id',
             'title',
+            'description',
             'available_from',
             'available_until',
-            'duration_minutes',
+            'duration_minutes'
           ],
-        },
+        }
       ],
-      order: [['created_at', 'DESC']],
+      order: [['created_at', 'DESC']]
     });
 
-    // Format the response cleanly
-    const result = assignedExams.map(a => ({
-      exam_id: a.exam_id,
-      title: a.exams?.title,
-      available_from: a.exams?.available_from,
-      available_until: a.exams?.available_until,
-      duration_minutes: a.exams?.duration_minutes,
-      max_attempts: a.max_attempts,
-    }));
+    if (!assigned || !assigned.exams) {
+      return res.json([]); // No exam assigned
+    }
 
-    res.json(result);
+    const exam = assigned.exams;
+
+    // Use Luxon for safe UTC handling
+    const { DateTime } = require("luxon");
+    const nowUTC = DateTime.now().toUTC();
+    const startUTC = DateTime.fromJSDate(exam.available_from).toUTC();
+    const endUTC = DateTime.fromJSDate(exam.available_until).toUTC();
+
+    // 🚫 Exam not open yet
+    if (nowUTC < startUTC) {
+      return res.json({
+        message: "Exam not yet open.",
+        exam_opens_at: startUTC.toISO(),
+        exam_closes_at: endUTC.toISO()
+      });
+    }
+
+    // 🚫 Exam closed
+    if (nowUTC > endUTC) {
+      return res.json({
+        message: "Exam is closed.",
+        exam_closed_at: endUTC.toISO()
+      });
+    }
+
+    // 🟢 Exam is currently open — send full info to Flutter
+    return res.json([
+      {
+        exam_id: exam.id,
+        title: exam.title,
+        description: exam.description,
+        duration_minutes: exam.duration_minutes,
+        available_from: startUTC.toISO(),   // send UTC ISO
+        available_until: endUTC.toISO()
+      }
+    ]);
+
   } catch (err) {
-    console.error('❌ Error fetching assigned exams:', err);
-    res.status(500).json({ message: 'Failed to fetch assigned exams', error: err.message });
+    console.error("❌ Error fetching assigned exam:", err);
+    res.status(500).json({ message: "Failed to fetch assigned exam" });
   }
 });
 
