@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { Exams, ExamSessions, ExamUserAccess, Users, ExamQuestions } = require('../../../models');
+const { Exams, ExamSessions, ExamUserAccess, Users, ExamQuestions, Organizations, AdminPermissions } = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require('../../../middleware/isAdmin');
 const { localToUtcISO, DEFAULT_EXAM_TIME_ZONE } = require("../../../utils/timezoneUtils");
+const { Op } = require("sequelize");
 
 /**
  * 📋 GET /api/admin/exams
@@ -353,40 +354,223 @@ router.put('/:examId/grant-attempt/:userId', auth, isAdmin, async (req, res) => 
 });
 
 /**
- * 📊 GET /api/admin/exams/:examId/results
- * View all sessions for a specific exam (for admin review dashboard)
+ * 📊 GET /api/admin/exams/results
+ * All exam sessions (all exams + all orgs) with optional filters + pagination.
+ * - Super Admin: sees everything
+ * - Admin: only orgs in admin_permissions (visibility B)
  */
-router.get('/:examId/results', auth, isAdmin, async (req, res) => {
-  const { examId } = req.params;
-
+router.get('/results', auth, isAdmin, async (req, res) => {
   try {
-    const sessions = await ExamSessions.findAll({
-      where: { exam_id: examId },
-      include: [
-        { model: Users, as: 'users', attributes: ['id', 'first_name', 'last_name', 'email'] },
-      ],
-      order: [['created_at', 'DESC']],
+    const {
+      page = 1,
+      limit = 50,
+      examId,
+      orgId,
+      dateFrom,
+      dateTo,
+      status,
+      sortBy,
+      sortOrder,
+    } = req.query;
+
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const perPage = Math.max(parseInt(limit, 10) || 50, 1);
+    const offset = (pageNum - 1) * perPage;
+
+    // -------------------------------
+    // SORTING SETUP
+    // -------------------------------
+    const ALLOWED_SORT_FIELDS = {
+      first_name: ['users', 'first_name'],
+      last_name: ['users', 'last_name'],
+      email: ['users', 'email'],
+      exam_title: ['exams', 'title'],
+      score: ['score'],
+      submitted_at: ['submitted_at'],
+      organization: ['users->organization', 'name'],
+    };
+
+    // Default sort
+    const sortFieldKey = sortBy || "submitted_at";
+    const sortDirection = sortOrder?.toUpperCase() === "ASC" ? "ASC" : "DESC";
+
+    let order = [];
+
+    if (ALLOWED_SORT_FIELDS[sortFieldKey]) {
+      const mapping = ALLOWED_SORT_FIELDS[sortFieldKey];
+
+      if (mapping.length === 1) {
+        // score OR submitted_at
+        order.push([mapping[0], sortDirection]);
+
+      } else if (mapping.length === 2) {
+        // Nested (users, organization, exams)
+        const [assoc, col] = mapping;
+        const parts = assoc.split("->");
+
+        if (parts.length === 1) {
+          order.push([{ model: Users, as: parts[0] }, col, sortDirection]);
+
+        } else if (parts.length === 2) {
+          order.push([
+            {
+              model: Users,
+              as: parts[0],
+              include: [
+                { model: Organizations, as: parts[1] }
+              ]
+            },
+            col,
+            sortDirection
+          ]);
+        }
+      }
+
+    } else {
+      // Fallback sort
+      order.push(["submitted_at", "DESC"]);
+    }
+
+    // -------------------------------
+    // FILTERING
+    // -------------------------------
+    const sessionWhere = {};
+
+    if (examId) sessionWhere.exam_id = examId;
+
+    if (dateFrom || dateTo) {
+      sessionWhere.submitted_at = {};
+      if (dateFrom) sessionWhere.submitted_at[Op.gte] = new Date(dateFrom);
+      if (dateTo)   sessionWhere.submitted_at[Op.lte] = new Date(dateTo);
+    }
+
+    // STATUS FILTER
+    if (status === "passed") {
+      sessionWhere.score = { [Op.gte]: 70 };
+    }
+
+    if (status === "failed") {
+      sessionWhere.score = {
+        [Op.and]: [
+          { [Op.ne]: null },
+          { [Op.lt]: 70 }
+        ]
+      };
+    }
+
+    if (status === "in-progress") {
+      sessionWhere.score = null;
+    }
+
+    // -------------------------------
+    // ADMIN VISIBILITY — ORG FILTERS
+    // -------------------------------
+    const userIncludeWhere = {};
+    const currentUser = req.user;
+
+    if (orgId) {
+      userIncludeWhere.organization_id = orgId;
+
+    } else if (currentUser.role_id === 2) {
+      // Admin must be restricted by admin_permissions
+      const perms = await AdminPermissions.findAll({
+        where: { admin_id: currentUser.id },
+      });
+
+      const orgIds = perms
+        .map(p => p.organization_id)
+        .filter(id => id != null);
+
+      if (orgIds.length === 0) {
+        return res.json({
+          page: pageNum,
+          limit: perPage,
+          total: 0,
+          totalPages: 0,
+          results: [],
+        });
+      }
+
+      userIncludeWhere.organization_id = { [Op.in]: orgIds };
+    }
+
+    // -------------------------------
+    // INCLUDE MODELS
+    // -------------------------------
+    const include = [
+      {
+        model: Exams,
+        as: 'exams',
+        attributes: ['id', 'title'],
+      },
+      {
+        model: Users,
+        as: 'users',
+        attributes: ['id', 'first_name', 'last_name', 'email', 'organization_id'],
+        include: [
+          {
+            model: Organizations,
+            as: 'organization',
+            attributes: ['id', 'name'],
+          },
+        ],
+        ...(Object.keys(userIncludeWhere).length > 0
+          ? { where: userIncludeWhere }
+          : {}),
+      },
+    ];
+
+    // -------------------------------
+    // MAIN QUERY
+    // -------------------------------
+    const { count, rows } = await ExamSessions.findAndCountAll({
+      where: sessionWhere,
+      include,
+      order,
+      limit: perPage,
+      offset,
+      distinct: true,
     });
 
-    const results = sessions.map(s => ({
-      session_id: s.id,
-      user: {
-        id: s.user.id,
-        name: `${s.user.first_name} ${s.user.last_name}`,
-        email: s.user.email,
-      },
-      attempt_number: s.attempt_number,
-      score: s.score,
-      submitted_at: s.submitted_at,
-      active: s.active,
-    }));
+    const totalPages = Math.ceil(count / perPage) || 1;
 
-    res.json({ exam_id: examId, results });
+    const results = rows.map(s => {
+      const exam = s.exams;
+      const user = s.users;
+      const org = user?.organization;
+
+      return {
+        session_id: s.id,
+        exam_id: s.exam_id,
+        exam_title: exam ? exam.title : null,
+        organization_id: user ? user.organization_id : null,
+        organization_name: org ? org.name : null,
+        attempt_number: s.attempt_number,
+        score: s.score,
+        submitted_at: s.submitted_at,
+        active: s.active,
+        user: {
+          id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email,
+        },
+      };
+    });
+
+    res.json({
+      page: pageNum,
+      limit: perPage,
+      total: count,
+      totalPages,
+      results,
+    });
   } catch (err) {
     console.error('❌ Failed to load exam results:', err);
     res.status(500).json({ message: 'Failed to load exam results' });
   }
 });
+
 
 /**
  * 🧐 GET /api/admin/exams/sessions/:sessionId/details
@@ -493,6 +677,156 @@ router.get('/summary', auth, isAdmin, async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch exam summary' });
   }
 });
+
+/**
+ * 📅 GET /api/admin/exams/upcoming
+ * Returns upcoming exams with organization name + enrollment progress
+ */
+router.get('/upcoming', auth, isAdmin, async (req, res) => {
+  try {
+    const now = new Date();
+
+    // 1️⃣ Get all exams that have not yet closed
+    const exams = await Exams.findAll({
+      where: {
+        available_until: {
+          [Op.gte]: now
+        }
+      },
+      attributes: [
+        'id',
+        'title',
+        'available_from',
+        'available_until',
+        'duration_minutes',
+      ],
+      include: [
+        {
+          model: Organizations,
+          as: 'organizations',
+          attributes: ['id', 'name']
+        }
+      ],
+      order: [['available_from', 'ASC']]
+    });
+
+    // 2️⃣ Load student counts per exam
+    const accessCounts = await ExamUserAccess.findAll({
+      attributes: [
+        'exam_id',
+        [Exams.sequelize.fn('COUNT', Exams.sequelize.col('user_id')), 'count']
+      ],
+      group: ['exam_id']
+    });
+
+    // Convert access count array → lookup map
+    const enrollmentMap = {};
+    accessCounts.forEach((row) => {
+      enrollmentMap[row.exam_id] = parseInt(row.dataValues.count, 10);
+    });
+
+    // 3️⃣ Format response for UI
+    const formatted = exams.map((exam) => {
+      const total = enrollmentMap[exam.id] || 0;
+
+      return {
+        id: exam.id,
+        title: exam.title,
+        org: exam.organizations?.map(o => o.name).join(', ') || "No organizations assigned",
+        duration: `${exam.duration_minutes} min`,
+
+        from: exam.available_from,
+        to: exam.available_until,
+
+        enrolled: {
+          current: total,
+          total: total // You can change later if capacity differs
+        },
+
+        progress: total === 0 ? 0 : Math.min(100, (total / total) * 100)
+      };
+    });
+
+    res.json(formatted);
+
+  } catch (err) {
+    console.error("❌ Failed to load upcoming exams:", err);
+    res.status(500).json({ message: "Failed to load upcoming exams" });
+  }
+});
+
+/**
+ * 🧩 POST /api/admin/exams/:examId/assign-org/:orgId
+ * Assign an entire organization to an exam
+ * 1. Add organization to exam_organization
+ * 2. Assign all users of that organization to ExamUserAccess
+ */
+router.post('/:examId/assign-org/:orgId', auth, isAdmin, async (req, res) => {
+  const { examId, orgId } = req.params;
+
+  try {
+    // Ensure exam exists
+    const exam = await Exams.findByPk(examId);
+    if (!exam) {
+      return res.status(404).json({ message: 'Exam not found.' });
+    }
+
+    // Ensure organization exists
+    const org = await Organizations.findByPk(orgId);
+    if (!org) {
+      return res.status(404).json({ message: 'Organization not found.' });
+    }
+
+    // 1️⃣ Insert into exam_organization (if not exists)
+    await exam.addOrganization(org);
+
+    // 2️⃣ Fetch all users of this org
+    const users = await Users.findAll({
+      where: { organization_id: orgId },
+      attributes: ['id'],
+    });
+
+    if (users.length === 0) {
+      return res.json({
+        message: `Organization assigned, but no users found in ${org.name}.`,
+      });
+    }
+
+    // 3️⃣ Assign users to exam if not already assigned
+    let created = 0;
+    for (const user of users) {
+      const exists = await ExamUserAccess.findOne({
+        where: { exam_id: examId, user_id: user.id },
+      });
+
+      if (!exists) {
+        await ExamUserAccess.create({
+          exam_id: examId,
+          user_id: user.id,
+          max_attempts: 1,
+          granted_by: req.user.id,
+        });
+        created++;
+      }
+    }
+
+    res.json({
+      message: `Organization assigned successfully.`,
+      exam_id: examId,
+      organization_id: orgId,
+      total_users: users.length,
+      newly_assigned: created,
+    });
+
+  } catch (err) {
+    console.error('❌ Failed to assign org to exam:', err);
+    res.status(500).json({
+      message: 'Failed to assign organization to exam.',
+      error: err.message,
+    });
+  }
+});
+
 
 
 module.exports = router;
