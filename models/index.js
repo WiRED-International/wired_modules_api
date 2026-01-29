@@ -62,6 +62,8 @@ ExamUserAccess.belongsTo(Users, { as: 'users', foreignKey: 'user_id' });
 
 ExamUserAccess.belongsTo(Users, { as: 'granted_by_user', foreignKey: 'granted_by' });
 
+Exams.belongsToMany(Organizations, { as: 'organizations', through: 'exam_organization', foreignKey: 'exam_id', otherKey: 'organization_id', });
+
 // ===============================
 // 📘 MODULE-RELATED ASSOCIATIONS
 // ===============================
@@ -104,6 +106,8 @@ Organizations.belongsTo(Countries, { as: 'country', foreignKey: 'country_id' });
 
 Cities.hasMany(Organizations, { as: 'organizations', foreignKey: 'city_id' });
 Organizations.belongsTo(Cities, { as: 'cities', foreignKey: 'city_id' });
+
+Organizations.belongsToMany(Exams, { as: 'exams', through: 'exam_organization', foreignKey: 'organization_id', otherKey: 'exam_id', });
 
 // ===============================
 // 💾 DOWNLOADS
