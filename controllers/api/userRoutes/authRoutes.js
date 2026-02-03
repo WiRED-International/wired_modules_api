@@ -3,6 +3,7 @@ const { Users, Countries } = require('../../../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require("nodemailer");
+const { sendWelcomeEmail } = require("../../../services/email");
 
 const secret = process.env.SECRET;
 
@@ -33,6 +34,11 @@ router.post('/register', async (req, res) => {
         //password is hashed before being stored in the database, using a hook in the User model
         password
     });
+
+    sendWelcomeEmail(newUser).catch((err) => {
+      console.error("Welcome email failed:", err);
+    });
+
     const token = jwt.sign(
       { 
         id: newUser.id, 

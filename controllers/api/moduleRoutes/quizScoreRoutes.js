@@ -3,6 +3,8 @@ const { QuizScores, Modules } = require('../../../models');
 const auth = require('../../../middleware/auth');
 const isAdmin = require('../../../middleware/isAdmin');
 const ROLES = require('../../../utils/roles');
+const { sendCme50AchievedEmail } = require('../../../services/email');
+const { Users } = require('../../../models');
 
 router.get('/', auth, async (req, res) => {
   const { userId } = req.query;
@@ -131,11 +133,51 @@ router.post('/', auth, async (req, res) => {
     });
 
     // 🧠 CME logic — 5 credits for score ≥ 80 only if module.credit_type === 'cme'
+    // 🧠 CME logic — award credits once per module per year
     let credits_awarded = 0;
     const passed = parsedScore >= 80;
 
-    if (passed && module.credit_type === 'cme') {
+    if (passed && module.credit_type === 'cme' && created) {
       credits_awarded = 5;
+
+      const user = await Users.findByPk(parsedUserId);
+      if (!user) {
+        throw new Error('User not found for CME update');
+      }
+
+      const currentYear = new Date().getFullYear();
+
+      // Year rollover (lazy reset)
+      if (user.cme_year !== currentYear) {
+        user.cme_year = currentYear;
+        user.cme_credits = 0;
+        user.cme_certificate_issued_at = null;
+      }
+
+      const previousCredits = user.cme_credits;
+      user.cme_credits += credits_awarded;
+
+      // 🎓 Certificate trigger (once per year)
+      if (
+        previousCredits < 50 &&
+        user.cme_credits >= 50 &&
+        !user.cme_certificate_issued_at
+      ) {
+        user.cme_certificate_issued_at = new Date();
+
+        try {
+          await sendCme50AchievedEmail(user);
+        } catch (emailErr) {
+          console.error(
+            `❌ CME certificate email failed for user ${user.id} (${user.email})`,
+            emailErr
+          );
+          // Intentionally do NOT throw
+          // Certificate issuance is still valid even if email fails
+        }
+      }
+
+      await user.save();
     }
 
     res.status(created ? 201 : 200).json({
