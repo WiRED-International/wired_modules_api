@@ -69,6 +69,24 @@ Users.init(
         key: 'id',
       },
     },
+    cme_credits: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    cme_year: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: new Date().getFullYear(),
+    },
+    cme_certificate_issued_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    cme_reminder_sent_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
   },
   {
     sequelize,
