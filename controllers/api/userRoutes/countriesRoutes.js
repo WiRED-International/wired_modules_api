@@ -16,6 +16,7 @@ router.get('/', async (req, res) => {
           }
         : {}, // no filter, return all if no search query
       attributes: ['id', 'name', 'code'],
+      order: [['name', 'ASC']],
     });
 
     res.status(200).json(countries);

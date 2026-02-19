@@ -24,6 +24,7 @@ const examSessionsRoutes = require('./examRoutes/examSessionsRoutes');
 const examRoutes = require('./examRoutes/examsRoutes');
 const adminExamRoutes = require('./examRoutes/adminExamRoutes');
 const adminOrganizationsRoutes = require('./adminRoutes/adminOrganizationsRoutes');
+const cmeCertificateRoutes = require('./certificateRoutes/cmeCertificateRoutes');
 
 router.use('/modules', modulesRoutes);
 router.use('/categories', categoriesRoutes);
@@ -52,5 +53,6 @@ router.use('/exam-sessions', examSessionsRoutes);
 router.use('/exams', examRoutes);
 router.use('/api/admin/exams', adminExamRoutes);
 router.use('/api/admin/organizations', adminOrganizationsRoutes);
+router.use('/certificates', cmeCertificateRoutes);
 
 module.exports = router;
