@@ -5,6 +5,9 @@ const isAdmin = require('../../../middleware/isAdmin');
 const ROLES = require('../../../utils/roles');
 const { sendCme50AchievedEmail } = require('../../../services/email');
 const { Users } = require('../../../models');
+const { Op } = require('sequelize');
+const { CmeCertificates } = require('../../../models');
+const issueCmeCertificate = require('../../../services/certificates/issueCmeCertificate');
 
 router.get('/', auth, async (req, res) => {
   const { userId } = req.query;
@@ -137,7 +140,21 @@ router.post('/', auth, async (req, res) => {
     let credits_awarded = 0;
     const passed = parsedScore >= 80;
 
-    if (passed && module.credit_type === 'cme' && created) {
+    const firstPassThisYear = await QuizScores.count({
+      where: {
+        user_id: parsedUserId,
+        module_id: resolvedModuleId,
+        score: { [Op.gte]: 80 },
+        date_taken: {
+          [Op.between]: [
+            new Date(`${new Date().getFullYear()}-01-01`),
+            new Date(`${new Date().getFullYear()}-12-31`),
+          ],
+        },
+      },
+    });
+
+    if (passed && module.credit_type === 'cme' && firstPassThisYear === 1) {
       credits_awarded = 5;
 
       const user = await Users.findByPk(parsedUserId);
@@ -166,14 +183,26 @@ router.post('/', auth, async (req, res) => {
         user.cme_certificate_issued_at = new Date();
 
         try {
-          await sendCme50AchievedEmail(user);
+          const year = new Date().getFullYear();
+
+          // ✅ CREATE the certificate record (ONCE)
+          const certificate = await issueCmeCertificate({
+            user_id: user.id,
+            year,
+            issued_at: new Date(),
+          });
+
+          // keep user flag (useful, but not the source of truth)
+          user.cme_certificate_issued_at = certificate.issued_at;
+
+          // ✅ Send email using the REAL certificate
+          await sendCme50AchievedEmail(user, certificate);
+
         } catch (emailErr) {
           console.error(
             `❌ CME certificate email failed for user ${user.id} (${user.email})`,
             emailErr
           );
-          // Intentionally do NOT throw
-          // Certificate issuance is still valid even if email fails
         }
       }
 

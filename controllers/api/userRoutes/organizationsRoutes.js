@@ -7,8 +7,9 @@ router.get('/', async (req, res) => {
       include: [
         {
           model: Countries,
-          as: 'country',
+          as: 'countries',              // ✅ updated alias
           attributes: ['id', 'name'],
+          through: { attributes: [] },  // ✅ hide join table
         },
         {
           model: Cities,
@@ -17,6 +18,7 @@ router.get('/', async (req, res) => {
         },
       ],
     });
+
     res.status(200).json(organizations);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -25,26 +27,26 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const organization = await Organizations.findByPk(
-      req.params.id,
-      {
-        include: [
-          {
-            model: Countries,
-            as: 'country',
-            attributes: ['id', 'name'],
-          },
-          {
-            model: Cities,
-            as: 'cities',
-            attributes: ['id', 'name'],
-          },
-        ],
-      }
-    );
+    const organization = await Organizations.findByPk(req.params.id, {
+      include: [
+        {
+          model: Countries,
+          as: 'countries',               // ✅ plural
+          attributes: ['id', 'name'],
+          through: { attributes: [] },   // ✅ hide join table
+        },
+        {
+          model: Cities,
+          as: 'cities',
+          attributes: ['id', 'name'],
+        },
+      ],
+    });
+
     if (!organization) {
       return res.status(404).json({ message: 'Organization not found' });
     }
+
     res.status(200).json(organization);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -52,32 +54,55 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-    const { name, country_id, city_id } = req.body;
+  const { name, country_ids = [], city_id } = req.body;
+
   try {
-    const newOrganization = await Organizations.create({
-        name,
-        country_id,
-        city_id,
+    const organization = await Organizations.create({
+      name,
+      city_id,
     });
 
-    res.status(201).json({ organization: newOrganization });
+    if (country_ids.length > 0) {
+      await organization.setCountries(country_ids); // ✅ Sequelize magic
+    }
+
+    const createdOrg = await Organizations.findByPk(organization.id, {
+      include: [
+        {
+          model: Countries,
+          as: 'countries',
+          attributes: ['id', 'name'],
+          through: { attributes: [] },
+        },
+      ],
+    });
+
+    res.status(201).json({ organization: createdOrg });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
 router.put('/:id', async (req, res) => {
-    const { name } = req.body;
+  const { name, country_ids } = req.body;
+
   try {
     const organization = await Organizations.findByPk(req.params.id);
     if (!organization) {
       return res.status(404).json({ message: 'Organization not found' });
     }
-    await organization.update({
-        name: name || organization.name,
-    });
 
-    res.status(200).json({ message: "Organization updated successfully", organization});
+    if (name) {
+      await organization.update({ name });
+    }
+
+    if (Array.isArray(country_ids)) {
+      await organization.setCountries(country_ids); // replaces associations
+    }
+
+    res.status(200).json({
+      message: 'Organization updated successfully',
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

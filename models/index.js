@@ -13,6 +13,8 @@ const Roles = require('./userModels/roles');
 const Users = require('./userModels/users');
 const AdminPermissions = require('./userModels/adminPermissions');
 const Specializations = require('./userModels/specializations');
+const CmeCertificates = require('./userModels/cmeCertificates');
+
 
 const Exams = require('./examModels/exams');
 const ExamQuestions = require('./examModels/examQuestions');
@@ -44,6 +46,19 @@ Specializations.belongsToMany(Users, { as: 'users', through: 'user_specializatio
 
 Users.hasMany(ExamSessions, { as: 'exam_sessions', foreignKey: 'user_id' });
 ExamSessions.belongsTo(Users, { as: 'users', foreignKey: 'user_id' });
+
+// ===============================
+// 🧾 CME CERTIFICATES
+// ===============================
+Users.hasMany(CmeCertificates, {
+  as: 'cme_certificates',
+  foreignKey: 'user_id',
+});
+
+CmeCertificates.belongsTo(Users, {
+  as: 'user',
+  foreignKey: 'user_id',
+});
 
 // ===============================
 // 🧮 EXAM-RELATED ASSOCIATIONS
@@ -101,8 +116,19 @@ AdminPermissions.belongsTo(Roles, { as: 'role', foreignKey: 'role_id' });
 Countries.hasMany(Cities, { as: 'cities', foreignKey: 'country_id' });
 Cities.belongsTo(Countries, { as: 'country', foreignKey: 'country_id' });
 
-Countries.hasMany(Organizations, { as: 'organizations', foreignKey: 'country_id' });
-Organizations.belongsTo(Countries, { as: 'country', foreignKey: 'country_id' });
+Countries.belongsToMany(Organizations, {
+  through: 'organization_countries',   // join table name
+  foreignKey: 'country_id',
+  otherKey: 'organization_id',
+  as: 'organizations',
+});
+
+Organizations.belongsToMany(Countries, {
+  through: 'organization_countries',
+  foreignKey: 'organization_id',
+  otherKey: 'country_id',
+  as: 'countries',
+});
 
 Cities.hasMany(Organizations, { as: 'organizations', foreignKey: 'city_id' });
 Organizations.belongsTo(Cities, { as: 'cities', foreignKey: 'city_id' });
@@ -143,4 +169,5 @@ module.exports = {
   ExamQuestions,
   ExamSessions,
   ExamUserAccess,
+  CmeCertificates,
 };
