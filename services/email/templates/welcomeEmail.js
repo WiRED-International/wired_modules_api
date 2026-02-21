@@ -28,7 +28,7 @@ function welcomeEmail(user) {
 
       <p>
         Additionally, if you are interested in establishing a new Community Health Worker program in your
-        region, WiRED International has worked with organizations globally to support the development of
+        region, WiRED International works with organizations globally to support the development of
         CHW training programs at no cost.
       </p>
 
@@ -48,6 +48,13 @@ function welcomeEmail(user) {
         Sincerely,<br />
         <strong>WiRED International</strong><br />
         HealthMAP Program
+      </p>
+
+      <p>
+        For more information about WiRED’s CME program:
+        <a href="https://wiredinternational.org" target="_blank">
+          https://wiredinternational.org
+        </a>
       </p>
     `,
   };
