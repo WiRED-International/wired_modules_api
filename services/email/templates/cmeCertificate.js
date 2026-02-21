@@ -25,7 +25,8 @@ function cmeCertificate(user) {
     <p>
       All CME credits are counted within the calendar year only. Any credits earned that do not
       contribute to completing the 50-credit requirement by December 31 will reset on January 1
-      and do not carry over into the next year.
+      and do not carry over into the next year. With that in mind, you are welcome to continue 
+      downloading and studying modules to advance your knowledge and skills.
     </p>
 
     <p>
