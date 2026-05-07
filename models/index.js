@@ -18,6 +18,8 @@ const CmeCertificates = require('./userModels/cmeCertificates');
 
 const Exams = require('./examModels/exams');
 const ExamQuestions = require('./examModels/examQuestions');
+const ExamTemplates = require('./examModels/examTemplates');
+const ExamTemplateQuestions = require('./examModels/examTemplateQuestions');
 const ExamSessions = require('./examModels/examSessions');
 const ExamUserAccess = require('./examModels/examUserAccess');
 
@@ -78,6 +80,32 @@ ExamUserAccess.belongsTo(Users, { as: 'users', foreignKey: 'user_id' });
 ExamUserAccess.belongsTo(Users, { as: 'granted_by_user', foreignKey: 'granted_by' });
 
 Exams.belongsToMany(Organizations, { as: 'organizations', through: 'exam_organization', foreignKey: 'exam_id', otherKey: 'organization_id', });
+
+// ===============================
+// 🧠 EXAM TEMPLATE ASSOCIATIONS
+// ===============================
+
+// Exam Template → Template Questions
+ExamTemplates.hasMany(ExamTemplateQuestions, {
+  as: 'exam_template_questions',
+  foreignKey: 'exam_template_id'
+});
+
+ExamTemplateQuestions.belongsTo(ExamTemplates, {
+  as: 'exam_template',
+  foreignKey: 'exam_template_id'
+});
+
+// Exam Template → Exams
+ExamTemplates.hasMany(Exams, {
+  as: 'exams',
+  foreignKey: 'exam_template_id'
+});
+
+Exams.belongsTo(ExamTemplates, {
+  as: 'exam_template',
+  foreignKey: 'exam_template_id'
+});
 
 // ===============================
 // 📘 MODULE-RELATED ASSOCIATIONS
@@ -167,6 +195,8 @@ module.exports = {
   Specializations,
   Exams,
   ExamQuestions,
+  ExamTemplates,
+  ExamTemplateQuestions,
   ExamSessions,
   ExamUserAccess,
   CmeCertificates,
