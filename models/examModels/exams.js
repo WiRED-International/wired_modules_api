@@ -30,6 +30,15 @@ Exams.init(
       type: DataTypes.INTEGER,
       allowNull: false
     },
+    exam_template_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'exam_templates',
+        key: 'id'
+      },
+      field: 'exam_template_id'
+    },
   },
   {
     sequelize,
