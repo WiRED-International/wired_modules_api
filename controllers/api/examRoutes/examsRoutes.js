@@ -1,6 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { Exams, ExamQuestions, ExamSessions, ExamUserAccess } = require('../../../models');
+const {
+  Exams,
+  ExamQuestions,
+  ExamSessions,
+  ExamUserAccess,
+  ExamTemplateQuestions
+} = require('../../../models');
 const auth = require("../../../middleware/auth");
 const { Op } = require('sequelize');
 const { shuffleExamQuestions } = require("../../../utils/examUtils")
@@ -129,16 +135,52 @@ router.get('/:id', auth, async (req, res) => {
 
 // GET /exams/:id/questions - Get all questions
 router.get('/:id/questions', auth, async (req, res) => {
+
   try {
-    const questions = await ExamQuestions.findAll({
-      where: { exam_id: req.params.id },
-      attributes: ['id', 'question_text', 'options'] // Don't expose correct_answer
-    });
+
+    const exam = await Exams.findByPk(req.params.id);
+
+    if (!exam) {
+      return res.status(404).json({
+        message: 'Exam not found'
+      });
+    }
+
+    let questions = [];
+
+    // ✅ NEW TEMPLATE-BASED EXAMS
+    if (exam.exam_template_id) {
+
+      questions = await ExamTemplateQuestions.findAll({
+        where: {
+          exam_template_id: exam.exam_template_id
+        },
+        attributes: ['id', 'question_text', 'options'],
+        order: [['order', 'ASC']]
+      });
+
+    }
+
+    // ✅ LEGACY EXAMS
+    else {
+
+      questions = await ExamQuestions.findAll({
+        where: { exam_id: req.params.id },
+        attributes: ['id', 'question_text', 'options'],
+        order: [['order', 'ASC']]
+      });
+
+    }
 
     res.json(questions);
+
   } catch (err) {
+
     console.error(err);
-    res.status(500).json({ message: 'Failed to fetch questions' });
+
+    res.status(500).json({
+      message: 'Failed to fetch questions'
+    });
   }
 });
 
@@ -150,22 +192,60 @@ router.post('/:id/start-session', auth, async (req, res) => {
 
   try {
     // ✅ Include correct field name (correct_answers instead of correct_answer)
-    const exam = await Exams.findByPk(exam_id, {
-      include: [
-        { 
-          model: ExamQuestions, 
-          as: 'exam_questions', 
-          attributes: ['id', 'question_type', 'question_text', 'options', 'correct_answers'] 
-        },
-      ],
-    });
+    const exam = await Exams.findByPk(exam_id);
 
     if (!exam) {
       return res.status(404).json({ message: 'Exam not found' });
     }
 
-    // ✅ Shuffle questions and their options
-    const { shuffledQuestions, questionOrder } = shuffleExamQuestions(exam.exam_questions, true);
+    let examQuestions = [];
+
+    // TEMPLATE-BASED EXAM
+    if (exam.exam_template_id) {
+
+      examQuestions = await ExamTemplateQuestions.findAll({
+        where: {
+          exam_template_id: exam.exam_template_id
+        },
+        attributes: [
+          'id',
+          'question_type',
+          'question_text',
+          'options',
+          'correct_answers'
+        ],
+        order: [['order', 'ASC']]
+      });
+
+    }
+
+    // ✅ LEGACY EXAM
+    else {
+
+      examQuestions = await ExamQuestions.findAll({
+        where: {
+          exam_id
+        },
+        attributes: [
+          'id',
+          'question_type',
+          'question_text',
+          'options',
+          'correct_answers'
+        ],
+        order: [['id', 'ASC']]
+      });
+
+    }
+
+    if (!examQuestions.length) {
+      return res.status(404).json({
+        message: 'No questions found for this exam'
+      });
+    }
+
+    // Shuffle questions and their options
+    const { shuffledQuestions, questionOrder } = shuffleExamQuestions(examQuestions, true);
 
     const now = new Date();
     if (now < exam.available_from || now > exam.available_until) {
@@ -217,16 +297,12 @@ router.post('/:id/start-session', auth, async (req, res) => {
       shuffle_order: JSON.stringify(questionOrder),
     });
 
-    // ✅ Fetch questions again (no correct_answers here — students shouldn’t see answers)
-    const questions = await ExamQuestions.findAll({
-      where: { exam_id },
-      attributes: ['id', 'question_text', 'options'],
-      order: [['id', 'ASC']]
-    });
-
     console.log(
       "🧩 Sending questions to client:",
-      exam.exam_questions.map(q => ({ id: q.id, type: q.question_type }))
+      examQuestions.map(q => ({
+        id: q.id,
+        type: q.question_type
+      }))
     );
 
     res.status(201).json({
