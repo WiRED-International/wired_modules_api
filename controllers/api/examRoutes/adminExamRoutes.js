@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Exams, ExamSessions, ExamUserAccess, Users, ExamQuestions, Organizations, AdminPermissions } = require('../../../models');
+const { Exams, ExamSessions, ExamUserAccess, Users, ExamQuestions, Organizations, AdminPermissions, ExamTemplates, ExamTemplateQuestions } = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require('../../../middleware/isAdmin');
 const { localToUtcISO, DEFAULT_EXAM_TIME_ZONE } = require("../../../utils/timezoneUtils");
@@ -194,29 +194,66 @@ router.get('/:id/questions', auth, isAdmin, async (req, res) => {
   const userRole = req.user?.roleId;
 
   try {
-    const canViewAnswers = includeAnswers && (userRole === 2 || userRole === 3); 
-    // Assuming roleId 2=Admin, 3=Super Admin
 
-    const questions = await ExamQuestions.findAll({
-      where: { exam_id: id },
-      order: [['order', 'ASC']],
-      attributes: canViewAnswers
-        ? undefined
-        : { exclude: ['correct_answers'] },
-    });
+    const exam = await Exams.findByPk(id);
+
+    if (!exam) {
+      return res.status(404).json({
+        message: `Exam ID ${id} not found`
+      });
+    }
+
+    const canViewAnswers =
+      includeAnswers && (userRole === 2 || userRole === 3);
+
+    let questions = [];
+
+    // ✅ NEW TEMPLATE-BASED LOGIC
+    if (exam.exam_template_id) {
+
+      questions = await ExamTemplateQuestions.findAll({
+        where: {
+          exam_template_id: exam.exam_template_id
+        },
+        order: [['order', 'ASC']],
+        attributes: canViewAnswers
+          ? undefined
+          : { exclude: ['correct_answers'] },
+      });
+
+    }
+
+    // ✅ FALLBACK FOR LEGACY EXAMS
+    else {
+
+      questions = await ExamQuestions.findAll({
+        where: { exam_id: id },
+        order: [['order', 'ASC']],
+        attributes: canViewAnswers
+          ? undefined
+          : { exclude: ['correct_answers'] },
+      });
+
+    }
 
     if (!questions || questions.length === 0) {
-      return res.status(404).json({ message: `No questions found for exam ID ${id}` });
+      return res.status(404).json({
+        message: `No questions found for exam ID ${id}`
+      });
     }
 
     res.status(200).json({
       message: `✅ Retrieved ${questions.length} question(s) for exam ${id}`,
       count: questions.length,
       includeAnswers: canViewAnswers,
+      using_template: !!exam.exam_template_id,
       questions,
     });
+
   } catch (error) {
+
     console.error('❌ Failed to fetch questions:', error);
+
     res.status(500).json({
       message: 'Failed to fetch exam questions',
       error: error.message,
@@ -236,7 +273,8 @@ router.post('/', auth, isAdmin, async (req, res) => {
       localStart,
       localEnd,
       timeZone,
-      duration_minutes
+      duration_minutes,
+      exam_template_id
     } = req.body;
 
     if (!localStart || !localEnd) {
@@ -257,7 +295,8 @@ router.post('/', auth, isAdmin, async (req, res) => {
       description,
       available_from: startUTC,
       available_until: endUTC,
-      duration_minutes
+      duration_minutes,
+      exam_template_id: exam_template_id || null
     });
 
     res.status(201).json({
@@ -827,6 +866,202 @@ router.post('/:examId/assign-org/:orgId', auth, isAdmin, async (req, res) => {
   }
 });
 
+router.get('/templates/:templateId/questions', auth, isAdmin, async (req, res) => {
 
+  const { templateId } = req.params;
+  const includeAnswers = req.query.includeAnswers === 'true';
+  const userRole = req.user?.roleId;
+
+  try {
+
+    const canViewAnswers =
+      includeAnswers && (userRole === 2 || userRole === 3);
+
+    const questions = await ExamTemplateQuestions.findAll({
+      where: {
+        exam_template_id: templateId
+      },
+      order: [['order', 'ASC']],
+      attributes: canViewAnswers
+        ? undefined
+        : { exclude: ['correct_answers'] },
+    });
+
+    if (!questions.length) {
+      return res.status(404).json({
+        message: `No questions found for template ID ${templateId}`
+      });
+    }
+
+    res.json({
+      count: questions.length,
+      questions
+    });
+
+  } catch (error) {
+
+    console.error('❌ Failed to fetch template questions:', error);
+
+    res.status(500).json({
+      message: 'Failed to fetch template questions',
+      error: error.message
+    });
+  }
+});
+
+router.post('/templates/:templateId/questions', auth, isAdmin, async (req, res) => {
+
+  const { templateId } = req.params;
+  const { questions } = req.body;
+
+  try {
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({
+        message: 'Questions array is required'
+      });
+    }
+
+    const formattedQuestions = questions.map((q, index) => {
+
+      let correctAnswers = [];
+
+      if (Array.isArray(q.correct_answers)) {
+        correctAnswers = q.correct_answers;
+
+      } else if (typeof q.correct_answers === 'string') {
+
+        try {
+          correctAnswers = JSON.parse(q.correct_answers);
+
+        } catch {
+          correctAnswers = [];
+        }
+      }
+
+      return {
+        exam_template_id: templateId,
+
+        question_type: q.question_type || 'single',
+
+        question_text: q.question_text?.trim(),
+
+        options: q.options || {},
+
+        correct_answers: correctAnswers,
+
+        order: q.order ?? index + 1,
+
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+    });
+
+    const created =
+      await ExamTemplateQuestions.bulkCreate(formattedQuestions);
+
+    res.status(201).json({
+      message: '✅ Template questions added successfully',
+      count: created.length,
+    });
+
+  } catch (error) {
+
+    console.error('❌ Failed to add template questions:', error);
+
+    res.status(500).json({
+      message: 'Failed to add template questions',
+      error: error.message,
+    });
+  }
+});
+
+router.get('/templates', auth, isAdmin, async (req, res) => {
+
+  try {
+
+    const templates = await ExamTemplates.findAll({
+      order: [['created_at', 'DESC']]
+    });
+
+    res.json(templates);
+
+  } catch (error) {
+
+    console.error('❌ Failed to load templates:', error);
+
+    res.status(500).json({
+      message: 'Failed to load templates',
+      error: error.message
+    });
+  }
+});
+
+router.post('/templates', auth, isAdmin, async (req, res) => {
+
+  const {
+    title,
+    description
+  } = req.body;
+
+  try {
+
+    const template = await ExamTemplates.create({
+      title,
+      description
+    });
+
+    res.status(201).json({
+      message: '✅ Template created successfully',
+      template
+    });
+
+  } catch (error) {
+
+    console.error('❌ Failed to create template:', error);
+
+    res.status(500).json({
+      message: 'Failed to create template',
+      error: error.message
+    });
+  }
+});
+
+router.get('/templates/:templateId', auth, isAdmin, async (req, res) => {
+
+  const { templateId } = req.params;
+
+  try {
+
+    const template = await ExamTemplates.findByPk(templateId, {
+      include: [
+        {
+          model: ExamTemplateQuestions,
+          as: 'exam_template_questions',
+        }
+      ],
+      order: [
+        [{ model: ExamTemplateQuestions, as: 'exam_template_questions' }, 'order', 'ASC']
+      ]
+    });
+
+    if (!template) {
+      return res.status(404).json({
+        message: 'Template not found'
+      });
+    }
+
+    res.json(template);
+
+  } catch (error) {
+
+    console.error('❌ Failed to load template:', error);
+
+    res.status(500).json({
+      message: 'Failed to load template',
+      error: error.message
+    });
+  }
+});
 
 module.exports = router;

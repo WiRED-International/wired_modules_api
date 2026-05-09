@@ -1,6 +1,6 @@
 const express = require('express');
 const router = require("express").Router();
-const { Users, Exams, ExamSessions, ExamQuestions } = require('../../../models');
+const { Users, Exams, ExamSessions, ExamQuestions, ExamTemplateQuestions } = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require("../../../middleware/isAdmin");
 const { calculateScore } = require("../../../utils/examUtils");
@@ -143,7 +143,7 @@ router.get('/exam-sessions/:id/details', auth, isAdmin, async (req, res) => {
     const session = await ExamSessions.findByPk(id, {
       include: [
         { model: Users, as: 'users', attributes: ['id', 'first_name', 'last_name', 'email'] },
-        { model: Exams, as: 'exams', attributes: ['id', 'title'] }
+        { model: Exams, as: 'exams', attributes: ['id', 'title', 'exam_template_id'] }
       ]
     });
 
@@ -151,11 +151,43 @@ router.get('/exam-sessions/:id/details', auth, isAdmin, async (req, res) => {
       return res.status(404).json({ message: 'Exam session not found' });
     }
 
-    const questions = await ExamQuestions.findAll({
-      where: { exam_id: session.exam_id },
-      attributes: ['id', 'question_text', 'options', 'correct_answers'],
-      order: [['id', 'ASC']]
-    });
+    let questions = [];
+
+    // ✅ TEMPLATE-BASED EXAM
+    if (session.exams?.exam_template_id) {
+
+      questions = await ExamTemplateQuestions.findAll({
+        where: {
+          exam_template_id: session.exams.exam_template_id
+        },
+        attributes: [
+          'id',
+          'question_text',
+          'options',
+          'correct_answers'
+        ],
+        order: [['order', 'ASC']]
+      });
+
+    }
+
+    // ✅ LEGACY EXAM
+    else {
+
+      questions = await ExamQuestions.findAll({
+        where: {
+          exam_id: session.exam_id
+        },
+        attributes: [
+          'id',
+          'question_text',
+          'options',
+          'correct_answers'
+        ],
+        order: [['id', 'ASC']]
+      });
+
+    }
 
     const combined = questions.map((q) => ({
       question_id: q.id,

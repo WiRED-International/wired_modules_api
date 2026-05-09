@@ -1,4 +1,6 @@
 const ExamQuestions = require('../models/examModels/examQuestions');
+const ExamTemplateQuestions = require('../models/examModels/examTemplateQuestions');
+const Exams = require('../models/examModels/exams');
 
 /**
  * Calculate score against the total # of questions.
@@ -10,11 +12,54 @@ async function calculateScore(answers, exam_id) {
     const safeAnswers = Array.isArray(answers) ? answers : [];
 
     // 1️⃣ Load questions
-    const examQuestions = await ExamQuestions.findAll({
-      where: { exam_id },
-      attributes: ['id', 'question_type', 'correct_answers', 'options'],
-      order: [['id', 'ASC']],
-    });
+    const exam = await Exams.findByPk(exam_id);
+
+    if (!exam) {
+      console.warn(`⚠️ [calculateScore] Exam not found for exam_id=${exam_id}`);
+      return { score: 0, correctCount: 0, total: 0 };
+    }
+
+    let examQuestions = [];
+
+    let usingTemplate = false;
+
+    // ✅ TEMPLATE-BASED EXAM
+    if (exam.exam_template_id) {
+
+      usingTemplate = true;
+
+      examQuestions = await ExamTemplateQuestions.findAll({
+        where: {
+          exam_template_id: exam.exam_template_id
+        },
+        attributes: [
+          'id',
+          'question_type',
+          'correct_answers',
+          'options'
+        ],
+        order: [['order', 'ASC']],
+      });
+
+    }
+
+    // ✅ LEGACY EXAM
+    else {
+
+      examQuestions = await ExamQuestions.findAll({
+        where: {
+          exam_id
+        },
+        attributes: [
+          'id',
+          'question_type',
+          'correct_answers',
+          'options'
+        ],
+        order: [['id', 'ASC']],
+      });
+
+    }
 
     const total = examQuestions.length;
     if (total === 0) {
@@ -94,7 +139,7 @@ async function calculateScore(answers, exam_id) {
     const score = (correctCount / total) * 100;
 
     console.log(
-      `📊 [calculateScore] exam_id=${exam_id} -> ${correctCount}/${total} correct (${score.toFixed(2)}%)`
+      `📊 [calculateScore] exam_id=${exam_id} (${usingTemplate ? 'template' : 'legacy'}) -> ${correctCount}/${total} correct (${score.toFixed(2)}%)`
     );
     return { score, correctCount, total };
   } catch (err) {
