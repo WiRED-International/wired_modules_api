@@ -23,6 +23,672 @@ router.get('/', auth, isAdmin, async (req, res) => {
   }
 });
 
+/**
+ * 📊 GET /api/admin/exams/kpis
+ * KPI metrics for exam dashboard
+ */
+router.get('/kpis', auth, isAdmin, async (req, res) => {
+
+  try {
+
+    const {
+      examId,
+      orgId,
+      dateFrom,
+      dateTo,
+      status,
+    } = req.query;
+
+    // -------------------------------
+    // FILTERING
+    // -------------------------------
+
+    const sessionWhere = {};
+
+    if (examId) {
+      sessionWhere.exam_id = examId;
+    }
+
+    if (dateFrom || dateTo) {
+
+      sessionWhere.submitted_at = {};
+
+      if (dateFrom) {
+        sessionWhere.submitted_at[Op.gte] =
+          new Date(dateFrom);
+      }
+
+      if (dateTo) {
+        sessionWhere.submitted_at[Op.lte] =
+          new Date(dateTo);
+      }
+
+    }
+
+    // STATUS FILTER
+
+    if (status === "passed") {
+      sessionWhere.score = {
+        [Op.gte]: 80
+      };
+    }
+
+    if (status === "failed") {
+      sessionWhere.score = {
+        [Op.and]: [
+          { [Op.ne]: null },
+          { [Op.lt]: 80 }
+        ]
+      };
+    }
+
+    if (status === "in-progress") {
+      sessionWhere.score = null;
+    }
+
+    // -------------------------------
+    // ADMIN VISIBILITY
+    // -------------------------------
+
+    const userIncludeWhere = {};
+
+    const currentUser =
+      req.user;
+
+    if (orgId) {
+
+      userIncludeWhere.organization_id =
+        orgId;
+
+    } else if (
+      currentUser.role_id === 2
+    ) {
+
+      const perms =
+        await AdminPermissions.findAll({
+          where: {
+            admin_id:
+              currentUser.id
+          }
+        });
+
+      const orgIds =
+        perms
+          .map(
+            p => p.organization_id
+          )
+          .filter(
+            id => id != null
+          );
+
+      if (orgIds.length === 0) {
+
+        return res.json({
+          totalAttempts: 0,
+          averageScore: 0,
+          passRate: 0,
+          activeExams: 0,
+        });
+
+      }
+
+      userIncludeWhere.organization_id = {
+        [Op.in]: orgIds
+      };
+
+    }
+
+    // -------------------------------
+    // LOAD MATCHING SESSIONS
+    // -------------------------------
+
+    const sessions =
+      await ExamSessions.findAll({
+
+        where:
+          sessionWhere,
+
+        include: [
+          {
+            model: Users,
+            as: 'users',
+            attributes: [
+              'organization_id'
+            ],
+
+            ...(Object.keys(userIncludeWhere).length > 0
+              ? {
+                  where:
+                    userIncludeWhere
+                }
+              : {})
+          }
+        ]
+
+      });
+
+    // -------------------------------
+    // KPI CALCULATIONS
+    // -------------------------------
+
+    const totalAttempts =
+      sessions.length;
+
+    const completedSessions =
+      sessions.filter(
+        s => s.score !== null
+      );
+
+    const averageScore =
+      completedSessions.length > 0
+        ? (
+            completedSessions.reduce(
+              (sum, s) =>
+                sum + Number(s.score),
+              0
+            ) /
+            completedSessions.length
+          ).toFixed(1)
+        : 0;
+
+    const passedCount =
+      completedSessions.filter(
+        s => Number(s.score) >= 80
+      ).length;
+
+    const passRate =
+      completedSessions.length > 0
+        ? (
+            passedCount /
+            completedSessions.length
+          ) * 100
+        : 0;
+
+    const activeExams =
+      sessions.filter(
+        s =>
+          s.active === true &&
+          s.score === null
+      ).length;
+
+    res.json({
+
+      totalAttempts,
+
+      averageScore:
+        Number(averageScore),
+
+      passRate:
+        Number(
+          passRate.toFixed(1)
+        ),
+
+      activeExams,
+
+    });
+
+  } catch (err) {
+
+    console.error(
+      '❌ Failed to load KPI metrics:',
+      err
+    );
+
+    res.status(500).json({
+      message:
+        'Failed to load KPI metrics'
+    });
+
+  }
+
+});
+
+/**
+ * 📈 GET /api/admin/exams/analytics
+ * Analytics data for exam dashboard charts
+ */
+router.get('/analytics', auth, isAdmin, async (req, res) => {
+  try {
+    const {
+      examId,
+      orgId,
+      dateFrom,
+      dateTo,
+      status,
+    } = req.query;
+
+    const sessionWhere = {};
+
+    if (examId) {
+      sessionWhere.exam_id = examId;
+    }
+
+    if (dateFrom || dateTo) {
+      sessionWhere.submitted_at = {};
+
+      if (dateFrom) {
+        sessionWhere.submitted_at[Op.gte] = new Date(dateFrom);
+      }
+
+      if (dateTo) {
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999);
+        sessionWhere.submitted_at[Op.lte] = endDate;
+      }
+    }
+
+    if (status === "passed") {
+      sessionWhere.score = { [Op.gte]: 80 };
+    }
+
+    if (status === "failed") {
+      sessionWhere.score = {
+        [Op.and]: [
+          { [Op.ne]: null },
+          { [Op.lt]: 80 },
+        ],
+      };
+    }
+
+    if (status === "in-progress") {
+      sessionWhere.score = null;
+    }
+
+    const userIncludeWhere = {};
+    const currentUser = req.user;
+
+    if (orgId) {
+      userIncludeWhere.organization_id = orgId;
+    } else if (currentUser.role_id === 2) {
+      const perms = await AdminPermissions.findAll({
+        where: { admin_id: currentUser.id },
+      });
+
+      const orgIds = perms
+        .map(p => p.organization_id)
+        .filter(id => id != null);
+
+      if (orgIds.length === 0) {
+        return res.json({
+          distribution: {
+            excellent: 0,
+            good: 0,
+            needsImprovement: 0,
+            totalCompleted: 0,
+          },
+        });
+      }
+
+      userIncludeWhere.organization_id = {
+        [Op.in]: orgIds,
+      };
+    }
+
+    const sessions = await ExamSessions.findAll({
+      where: sessionWhere,
+
+      attributes: [
+        'id',
+        'exam_id',
+        'score',
+        'answers'
+      ],
+
+      include: [
+        {
+          model: Users,
+          as: 'users',
+          attributes: ['organization_id'],
+
+          ...(Object.keys(userIncludeWhere).length > 0
+            ? { where: userIncludeWhere }
+            : {}),
+        },
+      ],
+    });
+
+    const completedSessions = sessions.filter(
+      s => s.score !== null
+    );
+
+    const questionStats = {};
+
+    for (const session of completedSessions) {
+
+      const exam = await Exams.findByPk(
+        session.exam_id,
+        {
+          attributes: [
+            'id',
+            'title',
+            'exam_template_id'
+          ]
+        }
+      );
+      const sessionExamTitle = exam?.title || "Unknown Exam";
+
+      let questions = [];
+
+      if (exam?.exam_template_id) {
+
+        questions =
+          await ExamTemplateQuestions.findAll({
+            where: {
+              exam_template_id:
+                exam.exam_template_id
+            },
+            attributes: [
+              'id',
+              'question_text',
+              'correct_answers'
+            ]
+          });
+
+      } else {
+
+        questions =
+          await ExamQuestions.findAll({
+            where: {
+              exam_id: session.exam_id
+            },
+            attributes: [
+              'id',
+              'question_text',
+              'correct_answers'
+            ]
+          });
+
+      }
+
+      const answerMap = {};
+
+      (session.answers || []).forEach(
+        answer => {
+          answerMap[
+            answer.question_id
+          ] = answer;
+        }
+      );
+
+      for (const question of questions) {
+
+        const userAnswer =
+          answerMap[question.id];
+
+        if (!userAnswer) {
+          continue;
+        }
+
+        const selected =
+          userAnswer.selected_option_ids || [];
+
+        const correct =
+          question.correct_answers || [];
+
+        const isCorrect =
+          selected.length === correct.length &&
+          selected.every(
+            id => correct.includes(id)
+          );
+
+        if (!questionStats[question.id]) {
+
+          questionStats[question.id] = {
+            questionId: question.id,
+            examId: session.exam_id,
+            examTitle: sessionExamTitle,
+            questionText: question.question_text,
+            missedCount: 0,
+            attemptCount: 0,
+          };
+
+        }
+
+        questionStats[question.id]
+          .attemptCount++;
+
+        if (!isCorrect) {
+
+          questionStats[question.id]
+            .missedCount++;
+
+        }
+
+      }
+
+    }
+
+    const mostMissedQuestions =
+      Object.values(questionStats)
+        .map(q => {
+
+          const missRate =
+            q.attemptCount > 0
+              ? Number(
+                  (
+                    q.missedCount /
+                    q.attemptCount *
+                    100
+                  ).toFixed(1)
+                )
+              : 0;
+
+          const difficultyScore =
+            missRate *
+            Math.log10(
+              q.attemptCount + 1
+            );
+
+          return {
+            ...q,
+            missRate,
+            difficultyScore,
+          };
+
+        })
+        .sort(
+          (a, b) =>
+            b.difficultyScore -
+            a.difficultyScore
+        )
+        .slice(0, 5);
+
+    const excellent = completedSessions.filter(
+      s => Number(s.score) >= 90
+    ).length;
+
+    const good = completedSessions.filter(
+      s =>
+        Number(s.score) >= 80 &&
+        Number(s.score) < 90
+    ).length;
+
+    const needsImprovement = completedSessions.filter(
+      s => Number(s.score) < 80
+    ).length;
+
+    console.log(
+      mostMissedQuestions.map(q => ({
+        questionId: q.questionId,
+        missRate: q.missRate,
+        attempts: q.attemptCount,
+        difficultyScore: q.difficultyScore,
+      }))
+    );
+    res.json({
+      distribution: {
+        excellent,
+        good,
+        needsImprovement,
+        totalCompleted:
+          completedSessions.length,
+      },
+
+      mostMissedQuestions,
+    });
+
+  } catch (err) {
+    console.error('❌ Failed to load exam analytics:', err);
+
+    res.status(500).json({
+      message: 'Failed to load exam analytics',
+    });
+  }
+});
+
+/**
+ * 📊 GET /api/admin/exams/question-analytics/:questionId
+ * Answer distribution for a single question
+ */
+router.get('/question-analytics/:questionId', auth, isAdmin, async (req, res) => {
+    const { questionId } = req.params;
+    console.log("questionId:", questionId);
+    let question =
+      await ExamTemplateQuestions.findByPk(
+        questionId
+      );
+
+    if (!question) {
+      question =
+        await ExamQuestions.findByPk(
+          questionId
+        );
+    }
+    console.log(
+      "Template Question:",
+      question
+    );
+    if (!question) {
+      return res.status(404).json({
+        message: "Question not found"
+      });
+    }
+    let examTitle = "Unknown Exam";
+    if (question.exam_template_id) {
+
+      const exam =
+        await Exams.findOne({
+          where: {
+            exam_template_id:
+              question.exam_template_id
+          },
+          attributes: [
+            'title'
+          ]
+        });
+
+      if (exam) {
+        examTitle =
+          exam.title;
+      }
+
+    } else if (question.exam_id) {
+
+      const exam =
+        await Exams.findByPk(
+          question.exam_id,
+          {
+            attributes: [
+              'title'
+            ]
+          }
+        );
+
+      if (exam) {
+        examTitle =
+          exam.title;
+      }
+
+    }
+
+    
+    const sessions =
+      await ExamSessions.findAll({
+        where: {
+          score: {
+            [Op.ne]: null
+          }
+        }
+      });
+    const optionCounts = {};
+    Object.keys(question.options)
+      .forEach(key => {
+        optionCounts[key] = 0;
+      });
+    for (const session of sessions) {
+
+      const answers =
+        session.answers || [];
+
+      const answer =
+        answers.find(
+          a =>
+            a.question_id ===
+            question.id
+        );
+
+      if (!answer) {
+        continue;
+      }
+
+      const selected =
+        answer.selected_option_ids || [];
+
+      selected.forEach(id => {
+
+        if (
+          optionCounts[id] !==
+          undefined
+        ) {
+          optionCounts[id]++;
+        }
+
+      });
+
+    }
+    const totalSelections =
+      Object.values(optionCounts)
+        .reduce(
+          (sum, count) =>
+            sum + count,
+          0
+        );
+    const distribution = Object.entries(question.options).map(([optionId, optionText]) => ({
+      optionId,
+      optionText,
+      count: optionCounts[optionId],
+      percent:
+        totalSelections > 0
+          ? Number(
+              (
+                optionCounts[optionId] /
+                totalSelections *
+                100
+              ).toFixed(1)
+            )
+          : 0,
+
+      isCorrect:
+        (question.correct_answers || [])
+          .includes(optionId),
+
+    }));
+    res.json({
+      questionId: question.id,
+
+      questionText:
+        question.question_text,
+
+      examTitle,
+
+      attemptCount:
+        totalSelections,
+
+      distribution,
+    });
+  }
+);
+
 // 🧠 Add questions to an existing exam (the :id is exam id)
 router.post('/:id/questions', auth, isAdmin, async (req, res) => {
   const { id } = req.params;
@@ -296,6 +962,7 @@ router.post('/', auth, isAdmin, async (req, res) => {
       available_from: startUTC,
       available_until: endUTC,
       duration_minutes,
+      time_zone: zone,
       exam_template_id: exam_template_id || null
     });
 
@@ -340,18 +1007,34 @@ router.post('/:examId/assign', auth, isAdmin, async (req, res) => {
     // ✅ Create ExamUserAccess entries
     const records = await Promise.all(
       user_ids.map(async (user_id) => {
+
+        const exists =
+          await ExamUserAccess.findOne({
+            where: {
+              exam_id: examId,
+              user_id
+            }
+          });
+
+        if (exists) {
+          return null;
+        }
+
         return ExamUserAccess.create({
           exam_id: examId,
           user_id,
-          max_attempts: max_attempts ?? 1,  // default to 1 attempt
-          granted_by: req.user.id,          // record which admin granted access
+          max_attempts: max_attempts ?? 1,
+          granted_by: req.user.id,
         });
+
       })
     );
 
+    const createdRecords = records.filter(Boolean);
+
     res.status(201).json({
-      message: `Access granted successfully to ${records.length} user(s).`,
-      records,
+      message: `Access granted successfully to ${createdRecords.length} user(s).`,
+      records: createdRecords,
     });
   } catch (err) {
     console.error('❌ Failed to assign users:', err);
@@ -485,7 +1168,7 @@ router.get('/results', auth, isAdmin, async (req, res) => {
 
     // STATUS FILTER
     if (status === "passed") {
-      sessionWhere.score = { [Op.gte]: 70 };
+      sessionWhere.score = { [Op.gte]: 80 };
     }
 
     if (status === "failed") {
@@ -617,11 +1300,31 @@ router.get('/results', auth, isAdmin, async (req, res) => {
  */
 router.get('/sessions/:sessionId/details', auth, isAdmin, async (req, res) => {
   const { sessionId } = req.params;
+  let questions = [];
 
   try {
     const session = await ExamSessions.findByPk(sessionId, {
       include: [
-        { model: Users, as: 'users', attributes: ['id', 'first_name', 'last_name', 'email'] },
+        {
+          model: Users,
+          as: 'users',
+          attributes: [
+            'id',
+            'first_name',
+            'last_name',
+            'email'
+          ],
+          include: [
+            {
+              model: Organizations,
+              as: 'organization',
+              attributes: [
+                'id',
+                'name'
+              ]
+            }
+          ]
+        },
         { model: Exams, as: 'exams' },
       ],
     });
@@ -629,25 +1332,75 @@ router.get('/sessions/:sessionId/details', auth, isAdmin, async (req, res) => {
     if (!session)
       return res.status(404).json({ message: 'Exam session not found' });
 
-    const questions = await ExamQuestions.findAll({
-      where: { exam_id: session.exam_id },
-      attributes: ['id', 'question_text', 'options', 'correct_answer'],
-      order: [['id', 'ASC']],
+    if (session.exams?.exam_template_id) {
+
+      questions = await ExamTemplateQuestions.findAll({
+        where: {
+          exam_template_id: session.exams.exam_template_id
+        },
+        attributes: [
+          'id',
+          'question_text',
+          'options',
+          'correct_answers'
+        ],
+        order: [['order', 'ASC']],
+      });
+
+    } else {
+
+      questions = await ExamQuestions.findAll({
+        where: {
+          exam_id: session.exam_id
+        },
+        attributes: [
+          'id',
+          'question_text',
+          'options',
+          'correct_answers'
+        ],
+        order: [['id', 'ASC']],
+      });
+
+    }
+    const answerMap = {};
+
+    (session.answers || []).forEach(answer => {
+      answerMap[answer.question_id] = answer;
+    });
+    const combined = questions.map(q => {
+
+      const userAnswer =
+        answerMap[q.id] || null;
+
+      const selected =
+        userAnswer?.selected_option_ids || [];
+
+      const correct =
+        q.correct_answers || [];
+
+      const isCorrect =
+        selected.length === correct.length &&
+        selected.every(id => correct.includes(id));
+
+      return {
+        question_id: q.id,
+        question_text: q.question_text,
+        options: q.options,
+        correct_answers: q.correct_answers,
+        user_answer: userAnswer,
+        is_correct: isCorrect,
+      };
+
     });
 
-    const combined = questions.map(q => ({
-      question_id: q.id,
-      question_text: q.question_text,
-      options: q.options,
-      correct_answer: q.correct_answer,
-      user_answer: session.answers?.[q.id] ?? null,
-    }));
-
     res.json({
-      user: session.user,
-      exam: session.exam,
+      user: session.users,
+      organization: session.users.organization?.name || null,
+      exam: session.exams,
       score: session.score,
       submitted_at: session.submitted_at,
+      attempt_number: session.attempt_number,
       questions: combined,
     });
   } catch (err) {
@@ -738,6 +1491,7 @@ router.get('/upcoming', auth, isAdmin, async (req, res) => {
         'available_from',
         'available_until',
         'duration_minutes',
+        'time_zone',
       ],
       include: [
         {
@@ -777,6 +1531,8 @@ router.get('/upcoming', auth, isAdmin, async (req, res) => {
         from: exam.available_from,
         to: exam.available_until,
 
+        timeZone: exam.time_zone,
+
         enrolled: {
           current: total,
           total: total // You can change later if capacity differs
@@ -791,6 +1547,218 @@ router.get('/upcoming', auth, isAdmin, async (req, res) => {
   } catch (err) {
     console.error("❌ Failed to load upcoming exams:", err);
     res.status(500).json({ message: "Failed to load upcoming exams" });
+  }
+});
+
+/**
+ * 📋 GET /api/admin/exams/scheduled
+ * Returns all scheduled exams with organizations,
+ * participant counts, and status.
+ */
+router.get('/scheduled', auth, isAdmin, async (req, res) => {
+
+  try {
+
+    const now = new Date();
+    const {
+      status,
+      search,
+      organizationId,
+      sortBy = "available_from",
+      sortOrder = "DESC",
+      page = 1,
+      limit = 25,
+    } = req.query;
+
+    const exams = await Exams.findAll({
+
+      include: [
+        {
+          model: Organizations,
+          as: 'organizations',
+          attributes: ['id', 'name'],
+          through: {
+            attributes: []
+          }
+        }
+      ],
+
+      order: [
+        ['available_from', 'DESC']
+      ]
+    });
+
+    const accessCounts = await ExamUserAccess.findAll({
+
+      attributes: [
+        'exam_id',
+        [
+          Exams.sequelize.fn(
+            'COUNT',
+            Exams.sequelize.col('user_id')
+          ),
+          'count'
+        ]
+      ],
+
+      group: ['exam_id']
+
+    });
+
+    const participantMap = {};
+
+    accessCounts.forEach((row) => {
+
+      participantMap[row.exam_id] =
+        parseInt(row.dataValues.count, 10);
+
+    });
+
+    const formatted = exams.map((exam) => {
+
+      let status = 'Scheduled';
+
+      if (
+        now >= exam.available_from &&
+        now <= exam.available_until
+      ) {
+        status = 'Active';
+      }
+
+      if (
+        now > exam.available_until
+      ) {
+        status = 'Closed';
+      }
+
+      return {
+
+        id: exam.id,
+
+        title: exam.title,
+
+        description: exam.description,
+
+        available_from: exam.available_from,
+
+        available_until: exam.available_until,
+
+        time_zone:
+          exam.time_zone,
+
+        duration_minutes:
+          exam.duration_minutes,
+
+        organizations:
+          exam.organizations,
+
+        participant_count:
+          participantMap[exam.id] || 0,
+
+        status
+
+      };
+    });
+
+    let filtered = formatted;
+
+    if (status && status !== 'All') {
+
+      filtered = filtered.filter(
+        (exam) =>
+          exam.status === status
+      );
+
+    }
+
+    if (search) {
+      filtered = filtered.filter(
+        (exam) =>
+          exam.title
+            .toLowerCase()
+            .includes(
+              search.toLowerCase()
+            )
+      );
+    }
+
+    if (organizationId) {
+      filtered = filtered.filter(
+        (exam) =>
+          exam.organizations.some(
+            (org) =>
+              org.id ===
+              Number(organizationId)
+          )
+      );
+    }
+
+    const direction = String(sortOrder).toUpperCase() === "ASC" ? 1 : -1;
+
+    filtered.sort((a, b) => {
+      let aValue;
+      let bValue;
+
+      switch (sortBy) {
+        case "title":
+          aValue = a.title || "";
+          bValue = b.title || "";
+          return aValue.localeCompare(bValue) * direction;
+
+        case "status":
+          aValue = a.status || "";
+          bValue = b.status || "";
+          return aValue.localeCompare(bValue) * direction;
+
+        case "available_until":
+          aValue = new Date(a.available_until).getTime();
+          bValue = new Date(b.available_until).getTime();
+          return (aValue - bValue) * direction;
+
+        case "participant_count":
+          return (a.participant_count - b.participant_count) * direction;
+
+        case "available_from":
+        default:
+          aValue = new Date(a.available_from).getTime();
+          bValue = new Date(b.available_from).getTime();
+          return (aValue - bValue) * direction;
+      }
+    });
+
+    const pageNumber = Number(page);
+    const pageSize = Number(limit);
+
+    const totalCount = filtered.length;
+
+    const pageCount = Math.ceil(
+      totalCount / pageSize
+    );
+
+    const paginatedExams =
+      filtered.slice(
+        (pageNumber - 1) * pageSize,
+        pageNumber * pageSize
+      );
+
+    res.json({
+      exams: paginatedExams,
+      totalCount,
+      page: pageNumber,
+      pageCount
+    });
+
+  } catch (err) {
+
+    console.error(
+      '❌ Failed to load scheduled exams:',
+      err
+    );
+
+    res.status(500).json({
+      message:
+        'Failed to load scheduled exams'
+    });
   }
 });
 
@@ -865,6 +1833,123 @@ router.post('/:examId/assign-org/:orgId', auth, isAdmin, async (req, res) => {
     });
   }
 });
+
+/**
+ * 🧩 DELETE /api/admin/exams/:examId/organizations/:orgId
+ * Remove organization from exam
+ * 1. Remove organization relationship
+ * 2. Remove all users from that organization
+ *    from ExamUserAccess
+ */
+router.delete(
+  '/:examId/organizations/:orgId',
+  auth,
+  isAdmin,
+  async (req, res) => {
+
+    const { examId, orgId } =
+      req.params;
+
+    try {
+
+      const exam =
+        await Exams.findByPk(
+          examId
+        );
+
+      if (!exam) {
+
+        return res
+          .status(404)
+          .json({
+            message:
+              'Exam not found.'
+          });
+
+      }
+
+      const org =
+        await Organizations.findByPk(
+          orgId
+        );
+
+      if (!org) {
+
+        return res
+          .status(404)
+          .json({
+            message:
+              'Organization not found.'
+          });
+
+      }
+
+      // Remove organization relationship
+      await exam.removeOrganization(
+        org
+      );
+
+      // Find all users in organization
+      const users =
+        await Users.findAll({
+          where: {
+            organization_id:
+              orgId
+          },
+          attributes: ['id'],
+        });
+
+      const userIds =
+        users.map(
+          user => user.id
+        );
+
+      // Remove access records
+      const removed =
+        await ExamUserAccess.destroy({
+          where: {
+            exam_id: examId,
+            user_id: userIds,
+          },
+        });
+
+      res.json({
+
+        message:
+          'Organization removed successfully.',
+
+        exam_id:
+          examId,
+
+        organization_id:
+          orgId,
+
+        users_removed:
+          removed,
+
+      });
+
+    } catch (err) {
+
+      console.error(
+        '❌ Failed to remove organization:',
+        err
+      );
+
+      res.status(500).json({
+
+        message:
+          'Failed to remove organization.',
+
+        error:
+          err.message,
+
+      });
+
+    }
+
+  }
+);
 
 router.get('/templates/:templateId/questions', auth, isAdmin, async (req, res) => {
 
@@ -1064,4 +2149,287 @@ router.get('/templates/:templateId', auth, isAdmin, async (req, res) => {
   }
 });
 
+/**
+ * 📋 GET /api/admin/exams/:examId
+ * Get one scheduled exam with organizations and assigned users
+ */
+router.get('/:examId', auth, isAdmin, async (req, res) => {
+  const { examId } = req.params;
+
+  try {
+    const exam = await Exams.findByPk(examId, {
+      include: [
+        {
+          model: Organizations,
+          as: 'organizations',
+          attributes: ['id', 'name'],
+          through: {
+            attributes: []
+          }
+        },
+        {
+          model: ExamTemplates,
+          as: 'exam_template',
+          attributes: ['id', 'title', 'description']
+        },
+        {
+          model: ExamUserAccess,
+          as: 'exam_user_access',
+          include: [
+            {
+              model: Users,
+              as: 'users',
+              attributes: ['id', 'first_name', 'last_name', 'email', 'organization_id'],
+              include: [
+                {
+                  model: Organizations,
+                  as: 'organization',
+                  attributes: ['id', 'name']
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    });
+
+    if (!exam) {
+      return res.status(404).json({
+        message: 'Exam not found'
+      });
+    }
+
+    res.json(exam);
+
+  } catch (err) {
+    console.error('❌ Failed to load exam details:', err);
+
+    res.status(500).json({
+      message: 'Failed to load exam details',
+      error: err.message
+    });
+  }
+});
+
 module.exports = router;
+
+/**
+ * ✏️ PUT /api/admin/exams/:examId
+ * Update basic exam details
+ */
+router.put('/:examId', auth, isAdmin, async (req, res) => {
+
+  const { examId } = req.params;
+
+  const {
+    title,
+    description,
+    localStart,
+    localEnd,
+    timeZone,
+    duration_minutes
+  } = req.body;
+
+  try {
+
+    const exam = await Exams.findByPk(examId);
+
+    if (!exam) {
+      return res.status(404).json({
+        message: 'Exam not found'
+      });
+    }
+
+    const zone =
+      timeZone ||
+      DEFAULT_EXAM_TIME_ZONE;
+
+    const startUTC =
+      localToUtcISO(
+        localStart,
+        zone
+      );
+
+    const endUTC =
+      localToUtcISO(
+        localEnd,
+        zone
+      );
+
+    await exam.update({
+
+      title,
+
+      description,
+
+      available_from:
+        startUTC,
+
+      available_until:
+        endUTC,
+
+      duration_minutes,
+
+      time_zone:
+        zone
+
+    });
+
+    res.json({
+
+      message:
+        'Exam updated successfully',
+
+      exam
+
+    });
+
+  } catch (err) {
+
+    console.error(
+      '❌ Failed to update exam:',
+      err
+    );
+
+    res.status(500).json({
+
+      message:
+        'Failed to update exam',
+
+      error:
+        err.message
+
+    });
+
+  }
+
+});
+
+/**
+ * 🗑 DELETE /api/admin/exams/:examId
+ * Delete an exam session
+ */
+router.delete(
+  '/:examId',
+  auth,
+  isAdmin,
+  async (req, res) => {
+
+    try {
+
+      const { examId } =
+        req.params;
+
+      const exam =
+        await Exams.findByPk(
+          examId
+        );
+
+      if (!exam) {
+
+        return res
+          .status(404)
+          .json({
+            message:
+              'Exam not found'
+          });
+
+      }
+
+      await exam.destroy();
+
+      res.json({
+
+        message:
+          'Exam deleted successfully'
+
+      });
+
+    } catch (err) {
+
+      console.error(
+        '❌ Failed to delete exam:',
+        err
+      );
+
+      res.status(500).json({
+
+        message:
+          'Failed to delete exam'
+
+      });
+
+    }
+
+  }
+);
+
+/**
+ * 👤 DELETE /api/admin/exams/:examId/users/:userId
+ * Remove a specific user from an exam
+ */
+router.delete(
+  '/:examId/users/:userId',
+  auth,
+  isAdmin,
+  async (req, res) => {
+
+    const { examId, userId } =
+      req.params;
+
+    try {
+
+      const removed =
+        await ExamUserAccess.destroy({
+          where: {
+            exam_id: examId,
+            user_id: userId,
+          },
+        });
+
+      if (!removed) {
+
+        return res
+          .status(404)
+          .json({
+            message:
+              'Assignment not found.'
+          });
+
+      }
+
+      res.json({
+
+        message:
+          'User removed successfully.',
+
+        exam_id:
+          examId,
+
+        user_id:
+          userId,
+
+      });
+
+    } catch (err) {
+
+      console.error(
+        '❌ Failed to remove user:',
+        err
+      );
+
+      res.status(500).json({
+
+        message:
+          'Failed to remove user.',
+
+        error:
+          err.message,
+
+      });
+
+    }
+
+  }
+);
+

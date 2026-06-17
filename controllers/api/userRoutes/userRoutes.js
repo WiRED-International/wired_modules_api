@@ -395,9 +395,12 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
         order.push(["last_name", "ASC"]);
     }
 
+    const effectiveSortBy =
+      sortBy || "last_name";
+
     const extraOrderCol =
-      sortBy && ["email", "first_name", "last_name"].includes(sortBy)
-        ? [sortBy]
+      ["email", "first_name", "last_name"].includes(effectiveSortBy)
+        ? [effectiveSortBy]
         : [];
 
     // ── Step 1: Fetch distinct user IDs ───────────────────────────────

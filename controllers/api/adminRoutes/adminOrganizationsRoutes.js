@@ -5,9 +5,9 @@ const auth = require("../../../middleware/auth");
 router.get("/accessible", auth, async (req, res) => {
   try {
     const user = req.user;
-
+    console.log("USER:", user);
     // SUPER ADMIN
-    if (user.role_id === 3) {
+    if (user.roleId === 3) {
       const orgs = await Organizations.findAll({
         attributes: ["id", "name"],
         order: [["name", "ASC"]],
@@ -16,7 +16,7 @@ router.get("/accessible", auth, async (req, res) => {
     }
 
     // ADMIN → orgs assigned via permissions
-    if (user.role_id === 2) {
+    if (user.roleId === 2) {
       const perms = await AdminPermissions.findAll({
         where: { admin_id: user.id },
         attributes: ["organization_id"],

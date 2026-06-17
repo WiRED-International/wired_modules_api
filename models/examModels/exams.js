@@ -30,6 +30,11 @@ Exams.init(
       type: DataTypes.INTEGER,
       allowNull: false
     },
+    time_zone: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "Africa/Nairobi",
+    },
     exam_template_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
