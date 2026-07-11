@@ -1,6 +1,7 @@
 const router = require("express").Router();
-const { Organizations, AdminPermissions } = require("../../../models");
+const { Organizations, AdminPermissions, Users } = require("../../../models");
 const auth = require("../../../middleware/auth");
+const { Sequelize } = require("sequelize");
 
 router.get("/accessible", auth, async (req, res) => {
   try {
@@ -9,7 +10,26 @@ router.get("/accessible", auth, async (req, res) => {
     // SUPER ADMIN
     if (user.roleId === 3) {
       const orgs = await Organizations.findAll({
-        attributes: ["id", "name"],
+        attributes: [
+          "id",
+          "name",
+          [
+            Sequelize.fn(
+              "COUNT",
+              Sequelize.col("users.id")
+            ),
+            "userCount",
+          ],
+        ],
+        include: [
+          {
+            model: Users,
+            as: "users",
+            attributes: [],
+            required: false,
+          },
+        ],
+        group: ["Organizations.id"],
         order: [["name", "ASC"]],
       });
       return res.json({ organizations: orgs });
@@ -26,7 +46,26 @@ router.get("/accessible", auth, async (req, res) => {
 
       const orgs = await Organizations.findAll({
         where: { id: orgIds },
-        attributes: ["id", "name"],
+        attributes: [
+          "id",
+          "name",
+          [
+            Sequelize.fn(
+              "COUNT",
+              Sequelize.col("users.id")
+            ),
+            "userCount",
+          ],
+        ],
+        include: [
+          {
+            model: Users,
+            as: "users",
+            attributes: [],
+            required: false,
+          },
+        ],
+        group: ["Organizations.id"],
         order: [["name", "ASC"]],
       });
 
