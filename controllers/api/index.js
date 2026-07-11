@@ -22,9 +22,11 @@ const specializationsRoutes = require('./moduleRoutes/specializationsRoutes');
 const emailRoutes = require('./emailRoutes');
 const examSessionsRoutes = require('./examRoutes/examSessionsRoutes');
 const examRoutes = require('./examRoutes/examsRoutes');
+const adminExamTemplatesRoutes = require('./examRoutes/adminExamTemplatesRoutes');
 const adminExamRoutes = require('./examRoutes/adminExamRoutes');
 const adminOrganizationsRoutes = require('./adminRoutes/adminOrganizationsRoutes');
 const cmeCertificateRoutes = require('./certificateRoutes/cmeCertificateRoutes');
+
 
 router.use('/modules', modulesRoutes);
 router.use('/categories', categoriesRoutes);
@@ -51,6 +53,11 @@ router.use('/api/specializations', specializationsRoutes);
 router.use('/email', emailRoutes);
 router.use('/exam-sessions', examSessionsRoutes);
 router.use('/exams', examRoutes);
+// IMPORTANT:
+// Template routes must be mounted before adminExamRoutes
+// because adminExamRoutes contains parameterized routes
+// such as /:examId that will capture /templates.
+router.use('/api/admin/exams', adminExamTemplatesRoutes);
 router.use('/api/admin/exams', adminExamRoutes);
 router.use('/api/admin/organizations', adminOrganizationsRoutes);
 router.use('/certificates', cmeCertificateRoutes);
