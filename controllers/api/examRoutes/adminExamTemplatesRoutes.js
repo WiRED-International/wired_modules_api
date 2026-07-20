@@ -200,6 +200,7 @@ router.put('/templates/:templateId', auth, isSuperAdmin, async (req, res) => {
   const {
     title,
     description,
+    program,
   } = req.body;
 
   try {
@@ -217,6 +218,7 @@ router.put('/templates/:templateId', auth, isSuperAdmin, async (req, res) => {
     await template.update({
       title,
       description,
+      program,
     });
 
     res.json({

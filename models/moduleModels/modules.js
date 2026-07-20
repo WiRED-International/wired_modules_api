@@ -55,6 +55,10 @@ Modules.init(
             allowNull: false,
             defaultValue: 'module',
         },
+        training_type: {
+            type: DataTypes.ENUM('basic', 'act', 'specialization'),
+            allowNull: true,
+        },
         credit_type: {
             type: DataTypes.ENUM('none', 'cme'),
             allowNull: false,

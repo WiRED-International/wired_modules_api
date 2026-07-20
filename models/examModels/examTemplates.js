@@ -17,7 +17,12 @@ ExamTemplates.init(
     description: {
       type: DataTypes.TEXT,
       allowNull: true
-    }
+    },
+    program: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "Basic Training"
+    },
   },
   {
     sequelize,

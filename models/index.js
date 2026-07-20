@@ -118,6 +118,20 @@ SubCategories.belongsToMany(Modules, { as: 'modules', through: 'module_subcatego
 Modules.belongsToMany(Letters, { as: 'letters', through: 'module_letter', foreignKey: 'module_id' });
 Letters.belongsToMany(Modules, { as: 'modules', through: 'module_letter', foreignKey: 'letter_id' });
 
+Modules.belongsToMany(Specializations, {
+  as: 'specializations',
+  through: 'module_specializations',
+  foreignKey: 'module_id',
+  otherKey: 'specialization_id',
+});
+
+Specializations.belongsToMany(Modules, {
+  as: 'modules',
+  through: 'module_specializations',
+  foreignKey: 'specialization_id',
+  otherKey: 'module_id',
+});
+
 Modules.hasMany(QuizScores, { as: 'quizScores', foreignKey: 'module_id' });
 QuizScores.belongsTo(Modules, { as: 'module', foreignKey: 'module_id' });
 

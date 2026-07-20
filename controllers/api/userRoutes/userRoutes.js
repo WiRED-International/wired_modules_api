@@ -10,165 +10,6 @@ const { calculateCmeCredits } = require('../../../utils/calculateCmeCredits');
 const sortAscend = 'ASC';
 const sortDescend = 'DESC';
 
-//this route is actually no longer beings used by the admin dashboard, but I am leaving it here in case it is being used elsewhere
-// router.get("/", auth, isAdmin, async (req, res) => {
-//   const { countryId, cityId, organizationId, roleId, sortBy, sortOrder = sortAscend, rowsPerPage = 10, pageNumber = 1 } = req.query;
-//   const allowedSortFields = [
-//     "actions",
-//     "first_name",
-//     "last_name",
-//     "email",
-//     "CME_Credits",
-//     "remainingCredits",
-//     "specializations",
-//     "role",
-//     "country",
-//     "city",
-//     "organization"
-//   ]
-  
-//   try {
-//     const user = req.user;
-//     let where = buildUserQueryFilters(req, { countryId, cityId, organizationId, roleId, sortBy, sortOrder, rowsPerPage, pageNumber });
-
-//     // 🧹 Clean up undefined filters before use
-//     Object.keys(where).forEach((key) => {
-//       if (where[key] === undefined) delete where[key];
-//     });
-
-//         // 🧩 Super Admin → Full access (no restriction)
-//     if (user.roleId === ROLES.SUPER_ADMIN) {
-//       // no change needed, full access
-//     }
-//     // 🧩 Admin → Only users from allowed organizations
-//     else if (user.roleId === ROLES.ADMIN) {
-//       // Find all organizations the admin can access
-//       console.log("👤 Logged-in user:", user);
-//       const adminPermissions = await AdminPermissions.findAll({
-//         where: { admin_id: user.id },
-//         attributes: ['organization_id']
-//       });
-//       console.log("📊 AdminPermissions found:", adminPermissions.map(p => p.organization_id));
-//       console.log("✅ AdminPermissions for admin", user.id, ":", adminPermissions.map(p => p.organization_id));
-//       const allowedOrgIds = adminPermissions.map(p => p.organization_id).filter(Boolean);
-
-//       if (allowedOrgIds.length === 0) {
-//         return res.status(403).json({ message: "No organization access assigned to this admin." });
-//       }
-
-//       // Limit users to those organizations
-//       // where = {
-//       //   ...where,
-//       //   organization_id: { [Op.in]: allowedOrgIds }
-//       // };
-//       if (allowedOrgIds.length > 0) {
-//         where.organization_id = { [Op.in]: allowedOrgIds };
-//       } else {
-//         console.warn(`⚠️ Admin ${user.id} has no assigned organizations — returning no users.`);
-//         where.organization_id = { [Op.in]: [] };
-//       }
-//     } 
-//     // 🧩 Regular user → Only themselves
-//     else {
-//       where = { id: user.id };
-//     }
-
-//     const order = [];
-//     if (sortBy) {
-
-//       const safeSortBy = allowedSortFields.includes(sortBy)
-//         ? sortBy
-//         : 'last_name'; // Default to last_name if sortBy is not allowed
-
-//       const safeSortOrder = sortOrder?.toUpperCase() === sortAscend ? sortAscend : sortDescend;
-//       switch (safeSortBy) {
-//         case 'organization':
-//           order.push([{ model: Organizations, as: 'organization' }, 'name', safeSortOrder]);
-//           break;
-
-//         case 'role':
-//           order.push([{ model: Roles, as: 'role' }, 'name', safeSortOrder]);
-//           break;
-
-//         case 'country':
-//           order.push([{ model: Countries, as: 'country' }, 'name', safeSortOrder]);
-//           break;
-
-//         case 'city':
-//           order.push([{ model: Cities, as: 'city' }, 'name', safeSortOrder]);
-//           break;
-
-//         case 'specializations':
-//           // Always ASC for alphabetic sorting of first specialization
-//           order.push([{ model: Specializations, as: 'specializations' }, 'name', sortAscend]);
-//           break;
-
-//         default:
-//           // Sorting by field on Users table
-//           order.push([safeSortBy, safeSortOrder]);
-//       }
-//     }
-
-//     const limit = parseInt(rowsPerPage, 10) || 10;
-//     const offset = ((parseInt(pageNumber, 10) || 1) - 1) * limit;
-
-
-
-//     const users = await Users.findAll({
-//       where,
-//       attributes: ["id", "first_name", "last_name", "email",],
-//       include: [
-//         {
-//           model: Organizations,
-//           as: "organization",
-//           attributes: ["name", "id"],
-//         },
-//         {
-//           model: Roles,
-//           as: "role",
-//           attributes: ["name", "id"],
-//         },
-//         {
-//           model: Countries,
-//           as: "country",
-//           attributes: ["name", "id"],
-//         },
-//         {
-//           model: Cities,
-//           as: "city",
-//           attributes: ["name", "id"],
-//         },
-//         {
-//           model: QuizScores,
-//           as: 'quizScores',
-//           attributes: ['score', 'date_taken'],
-//           include: [
-//             {
-//               model: Modules,
-//               as: 'module',
-//               attributes: ['name', 'module_id',],
-//             },
-//           ],
-//         },
-//         {
-//           model: Specializations,
-//           as: 'specializations',
-//           attributes: ['name', 'id'],
-//         }
-//       ],
-//       order: order.length > 0 ? order : [['last_name', sortAscend]], // Default sort by last_name if no sortBy provided
-//       limit,
-//       offset,
-//     });
-
-//     return res.status(200).json(users);
-//   } catch (err) {
-//     console.error(err);
-//     return res.status(403).json({ message: err.message });
-//   }
-// });
-
-
 router.get('/me', auth, async (req, res) => {
   try {
     // Fetch the authenticated user's details
@@ -285,6 +126,139 @@ router.get("/search", auth, isAdmin, async (req, res) => {
   } catch (err) {
     console.log(err);
     return res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/:userId/learning-progress", auth, isAdmin, async (req, res) => {
+  try {
+
+    const { userId } = req.params;
+
+    const quizScores = await QuizScores.findAll({
+      where: {
+        user_id: userId,
+      },
+      attributes: [
+        "id",
+        "score",
+        "date_taken",
+      ],
+      include: [
+        {
+          model: Modules,
+          as: "module",
+          attributes: [
+            "id",
+            "module_id",
+            "name",
+            "training_type",
+            "credit_type",
+            "categories",
+          ],
+        },
+      ],
+    });
+
+    function calculateProgress({
+      quizScores,
+      totalModules,
+      isMatch,
+      passingScore = 80,
+    }) {
+      const completedModuleIds = new Set();
+
+      quizScores.forEach((qs) => {
+        if (
+          qs.score >= passingScore &&
+          qs.module &&
+          isMatch(qs.module)
+        ) {
+          completedModuleIds.add(qs.module.id);
+        }
+      });
+
+      const completed = completedModuleIds.size;
+
+      return {
+        completed,
+        total: totalModules,
+        percent:
+          totalModules > 0
+            ? Number(((completed / totalModules) * 100).toFixed(2))
+            : 0,
+      };
+    }
+
+    const basicTraining = calculateProgress({
+      quizScores,
+      totalModules: 28,
+      isMatch: (module) =>
+        module.training_type === "basic" ||
+        (
+          Array.isArray(module.categories) &&
+          module.categories.includes("basic")
+        ),
+    });
+
+    const act = calculateProgress({
+      quizScores,
+      totalModules: 18,
+      isMatch: (module) =>
+        module.training_type === "act",
+    });
+
+    // const specializationRecords = await Specializations.findAll({
+    //   attributes: ["id", "name"],
+    //   include: [
+    //     {
+    //       model: Modules,
+    //       as: "modules",
+    //       attributes: ["id"],
+    //       through: {
+    //         attributes: [],
+    //       },
+    //     },
+    //   ],
+    //   order: [["name", "ASC"]],
+    // });
+
+    // specializationRecords.forEach((specialization) => {
+    //   console.log(
+    //     specialization.name,
+    //     specialization.modules.length
+    //   );
+    // });
+
+    // const specializations = specializationRecords.map((specialization) => {
+    //   const specializationModuleIds = new Set(
+    //     specialization.modules.map((module) => module.id)
+    //   );
+
+    //   const progress = calculateProgress({
+    //     quizScores,
+    //     totalModules: specializationModuleIds.size,
+    //     isMatch: (module) =>
+    //       specializationModuleIds.has(module.id),
+    //   });
+
+    //   return {
+    //     id: specialization.id,
+    //     name: specialization.name,
+    //     ...progress,
+    //   };
+    // });
+
+    return res.json({
+      basicTraining,
+      act,
+    });
+
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 });
 
@@ -619,6 +593,72 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(403).json({ message: err.message });
+  }
+});
+
+router.get("/:id/transcript", auth, isAdmin, async (req, res) => {
+  const targetUserId = req.params.id;
+  const requester = req.user;
+  const { buildLearnerTranscript, } = require("../../../services/learnerTranscriptService");
+
+  try {
+
+    const user = await Users.findOne({
+      where: {
+        id: targetUserId,
+      },
+
+      attributes: [
+        "id",
+        "organization_id",
+        "role_id",
+      ],
+
+      include: [
+        {
+          model: QuizScores,
+          as: "quizScores",
+          attributes: [
+            "id",
+            "score",
+            "date_taken",
+          ],
+          include: [
+            {
+              model: Modules,
+              as: "module",
+              attributes: [
+                "module_id",
+                "name",
+                "categories",
+                "credit_type",
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    const transcript = await buildLearnerTranscript(targetUserId);
+
+    return res.json({
+      transcript,
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    return res.status(500).json({
+      message: err.message,
+    });
+
   }
 });
 
