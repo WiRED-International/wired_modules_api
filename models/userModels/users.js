@@ -16,7 +16,7 @@ Users.init(
     },
     wired_user_id: {
       type: DataTypes.STRING(16),
-      allowNull: true,          // We'll make this false later
+      allowNull: false,
       unique: true,
     },
     first_name: {
