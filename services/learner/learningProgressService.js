@@ -1,4 +1,4 @@
-const { QuizScores, Modules } = require("../models");
+const { QuizScores, Modules } = require("../../models");
 
 const BASIC_REQUIRED_COMPLETIONS = 28;
 

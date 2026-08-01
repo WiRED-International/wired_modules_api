@@ -1,5 +1,8 @@
 const router = require('express').Router();
 const { Users, Countries } = require('../../../models');
+const sequelize = require("../../../config/connection");
+const { UniqueConstraintError } = require("sequelize");
+const generateWiredUserId = require("../../../utils/generateWiredUserId");
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require("nodemailer");
@@ -8,22 +11,48 @@ const { sendWelcomeEmail } = require("../../../services/email");
 const secret = process.env.SECRET;
 
 router.post('/register', async (req, res) => {
-    const { first_name, last_name, email, role_id, country_id, city_id, organization_id, password } = req.body;
+
+  const {
+    first_name,
+    last_name,
+    email,
+    role_id,
+    country_id,
+    city_id,
+    organization_id,
+    password
+  } = req.body;
+
+  // Check if the email already exists
+  const user = await Users.findOne({
+    where: { email },
+  });
+
+  if (user) {
+    return res.status(400).json({
+      message: "Email already exists",
+    });
+  }
+
+  // Validate the country before starting a transaction
+  if (country_id) {
+    const country = await Countries.findByPk(country_id);
+
+    if (!country) {
+      return res.status(400).json({
+        message: "Invalid country ID",
+      });
+    }
+  }
+
+  let transaction;
+
   try {
-    const user = await Users.findOne({ where: { email } });
-    if (user) {
-      return res.status(400).json({ message: 'email already exists' });
-    }
 
-    // Validate the provided country_id
-    if (country_id) {
-      const country = await Countries.findByPk(country_id);
-      if (!country) {
-        return res.status(400).json({ message: 'Invalid country ID' });
-      }
-    }
+    transaction = await sequelize.transaction();
 
-    const newUser = await Users.create({
+    const newUser = await Users.create(
+      {
         first_name,
         last_name,
         email,
@@ -31,31 +60,58 @@ router.post('/register', async (req, res) => {
         country_id,
         city_id,
         organization_id,
-        //password is hashed before being stored in the database, using a hook in the User model
-        password
-    });
+        password,
+      },
+      { transaction }
+    );
+
+    newUser.wired_user_id = generateWiredUserId(newUser.id);
+    await newUser.save({ transaction });
+
+    await newUser.reload({ transaction });
+
+    await transaction.commit();
 
     sendWelcomeEmail(newUser).catch((err) => {
       console.error("Welcome email failed:", err);
     });
 
     const token = jwt.sign(
-      { 
-        id: newUser.id, 
-        email: newUser.email, 
+      {
+        id: newUser.id,
+        email: newUser.email,
         roleId: newUser.role_id,
         country_id: newUser.country_id,
         city_id: newUser.city_id,
-        //adding organization_id to the token so it can be used in certain queries
         organization_id: newUser.organization_id,
-      }, 
-      secret, 
-      { expiresIn: '10y' }
+      },
+      secret,
+      { expiresIn: "10y" }
     );
-    res.status(201).json({ user: newUser, token });
+
+    return res.status(201).json({
+      user: newUser,
+      token,
+    });
+
   } catch (err) {
-    res.status(500).json({ message: err.message });
+
+    if (transaction) {
+      await transaction.rollback();
+    }
+
+    if (err instanceof UniqueConstraintError) {
+      return res.status(400).json({
+        message: "Email already exists",
+      });
+    }
+
+    return res.status(500).json({
+      message: err.message,
+    });
+
   }
+
 });
 
 router.post('/login', async (req, res) => {

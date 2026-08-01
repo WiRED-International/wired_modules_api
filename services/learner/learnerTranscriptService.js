@@ -5,7 +5,7 @@ const {
   ExamSessions,
   Exams,
   ExamTemplates,
-} = require("../models");
+} = require("../../models");
 /**
  * Builds a normalized learning transcript for a learner.
  *

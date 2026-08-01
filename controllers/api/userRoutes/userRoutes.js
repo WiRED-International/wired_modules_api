@@ -599,7 +599,7 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
 router.get("/:id/transcript", auth, isAdmin, async (req, res) => {
   const targetUserId = req.params.id;
   const requester = req.user;
-  const { buildLearnerTranscript, } = require("../../../services/learnerTranscriptService");
+  const { buildLearnerTranscript, } = require("../../../services/learner/learnerTranscriptService");
 
   try {
 
