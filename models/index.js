@@ -23,6 +23,8 @@ const ExamTemplateQuestions = require('./examModels/examTemplateQuestions');
 const ExamSessions = require('./examModels/examSessions');
 const ExamUserAccess = require('./examModels/examUserAccess');
 
+const Programs = require('./userModels/Programs');
+
 const Alerts = require('./alerts');
 
 // ===============================
@@ -214,4 +216,5 @@ module.exports = {
   ExamSessions,
   ExamUserAccess,
   CmeCertificates,
+  Programs,
 };

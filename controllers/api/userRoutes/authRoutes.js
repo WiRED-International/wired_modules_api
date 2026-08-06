@@ -5,8 +5,10 @@ const { UniqueConstraintError } = require("sequelize");
 const generateWiredUserId = require("../../../utils/generateWiredUserId");
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const nodemailer = require("nodemailer");
-const { sendWelcomeEmail } = require("../../../services/email");
+const {
+  sendWelcomeEmail,
+  sendPasswordResetEmail,
+} = require("../../../services/email");
 
 const secret = process.env.SECRET;
 
@@ -167,53 +169,103 @@ router.post('/logout', (req, res) => {
   res.status(200).json({ message: 'Logout successful' });
 });
 
-//routes for password reset functionality
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false, // I was told to use `true` for port 465, `false` for other ports
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
-
-
 router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
+
   try {
-    const user = await Users.findOne({ where: { email } });
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid email' });
+    const normalizedEmail = email?.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      return res.status(400).json({
+        message: 'Email is required',
+      });
     }
-    const token = jwt.sign({ id: user.id }, secret, { expiresIn: '1h' });
-    const url = `${process.env.CLIENT_URL}/reset-password/${token}`;
-    const mailOptions = {
-      from: process.env.SMTP_FROM,
-      to: email,
-      subject: 'Password Reset',
-      text: `Click this link to reset your password: ${url}`,
-    };
-    await transporter.sendMail(mailOptions);
-    res.status(200).json({ message: 'Password reset email sent' });
+
+    const user = await Users.findOne({
+      where: { email: normalizedEmail },
+    });
+
+    if (user) {
+      const token = jwt.sign(
+        {
+          id: user.id,
+          purpose: "password-reset",
+        },
+        secret,
+        { expiresIn: '1h' }
+      );
+
+      const url = `${process.env.CLIENT_URL}/reset-password/${token}`;
+
+      await sendPasswordResetEmail(
+        normalizedEmail,
+        url
+      );
+    }
+
+    return res.status(200).json({
+      message:
+        'If an account exists for this email, a password reset link has been sent.',
+    });
+
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Forgot password error:', err);
+
+    return res.status(500).json({
+      message: 'Unable to process the password reset request.',
+    });
   }
-})
+});
 
 router.post('/reset-password', async (req, res) => {
   const { token, password } = req.body;
+  console.log("Received token:", token);
+  if (!password || password.length < 8) {
+    return res.status(400).json({
+      success: false,
+      message: "Password must be at least 8 characters long.",
+    });;
+  }
   try {
-    const { id } = jwt.verify(token, secret);
-    const user = await Users.findByPk(id);
+    const payload = jwt.verify(token, secret);
+    console.log("JWT payload:", payload);
+
+      if (payload.purpose !== "password-reset") {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid or expired reset link.",
+        });
+      }
+
+    const user = await Users.findByPk(payload.id);
     if (!user) {
       return res.status(400).json({ message: 'Invalid token' });
     }
     user.password = password;
     await user.save();
-    res.status(200).json({ message: 'Password reset successful' });
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successful.",
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+
+    if (
+      err.name === "TokenExpiredError" ||
+      err.name === "JsonWebTokenError"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid reset link.",
+      });
+    }
+
+    console.error("Reset password error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to reset password.",
+    });
+
   }
 })
 

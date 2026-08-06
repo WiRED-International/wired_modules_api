@@ -1,6 +1,6 @@
 // utils/email/index.js
 const sendEmail = require("./sendEmail");
-
+const passwordReset = require("./templates/passwordReset");
 const welcomeEmail = require("./templates/welcomeEmail");
 const cmeCertificate = require("./templates/cmeCertificate");
 const cmeReminder = require("./templates/cmeReminder");
@@ -10,6 +10,18 @@ const generateCmeCertificatePdf = require('../../services/certificates/generateC
 async function sendWelcomeEmail(user) {
   const { subject, html } = welcomeEmail(user);
   return sendEmail({ to: user.email, subject, html });
+}
+
+async function sendPasswordResetEmail(email, resetUrl) {
+
+  const { subject, html } = passwordReset(resetUrl);
+
+  return sendEmail({
+    to: email,
+    subject,
+    html,
+  });
+
 }
 
 async function sendCme50AchievedEmail(user, certificate) {
@@ -48,6 +60,7 @@ async function sendCmeReminderEmail(user) {
 
 module.exports = {
   sendWelcomeEmail,
+  sendPasswordResetEmail,
   sendCme50AchievedEmail,
   sendCmeReminderEmail,
 };
