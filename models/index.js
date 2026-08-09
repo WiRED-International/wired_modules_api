@@ -24,6 +24,8 @@ const ExamSessions = require('./examModels/examSessions');
 const ExamUserAccess = require('./examModels/examUserAccess');
 
 const Programs = require('./userModels/Programs');
+const Classes = require('./userModels/Classes');
+const ClassEnrollments = require('./userModels/ClassEnrollments');
 
 const Alerts = require('./alerts');
 
@@ -50,6 +52,77 @@ Specializations.belongsToMany(Users, { as: 'users', through: 'user_specializatio
 
 Users.hasMany(ExamSessions, { as: 'exam_sessions', foreignKey: 'user_id' });
 ExamSessions.belongsTo(Users, { as: 'users', foreignKey: 'user_id' });
+
+// ===============================
+// 🎓 PROGRAMS & CLASSES
+// ===============================
+
+// Program -> Classes
+Programs.hasMany(Classes, {
+  as: 'classes',
+  foreignKey: 'program_id',
+});
+
+Classes.belongsTo(Programs, {
+  as: 'program',
+  foreignKey: 'program_id',
+});
+
+// Organization -> Classes
+Organizations.hasMany(Classes, {
+  as: 'classes',
+  foreignKey: 'organization_id',
+});
+
+Classes.belongsTo(Organizations, {
+  as: 'organization',
+  foreignKey: 'organization_id',
+});
+
+// User (creator) -> Classes
+Users.hasMany(Classes, {
+  as: 'created_classes',
+  foreignKey: 'created_by_user_id',
+});
+
+Classes.belongsTo(Users, {
+  as: 'created_by_user',
+  foreignKey: 'created_by_user_id',
+});
+
+Users.belongsToMany(Classes, {
+  through: ClassEnrollments,
+  as: 'classes',
+  foreignKey: 'user_id',
+  otherKey: 'class_id',
+});
+
+Classes.belongsToMany(Users, {
+  through: ClassEnrollments,
+  as: 'students',
+  foreignKey: 'class_id',
+  otherKey: 'user_id',
+});
+
+Users.hasMany(ClassEnrollments, {
+  as: 'class_enrollments',
+  foreignKey: 'user_id',
+});
+
+ClassEnrollments.belongsTo(Users, {
+  as: 'user',
+  foreignKey: 'user_id',
+});
+
+Classes.hasMany(ClassEnrollments, {
+  as: 'class_enrollments',
+  foreignKey: 'class_id',
+});
+
+ClassEnrollments.belongsTo(Classes, {
+  as: 'class',
+  foreignKey: 'class_id',
+});
 
 // ===============================
 // 🧾 CME CERTIFICATES
@@ -217,4 +290,6 @@ module.exports = {
   ExamUserAccess,
   CmeCertificates,
   Programs,
+  Classes,
+  ClassEnrollments,
 };
