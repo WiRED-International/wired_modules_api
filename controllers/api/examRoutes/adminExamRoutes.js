@@ -1,8 +1,22 @@
 const express = require('express');
 const router = express.Router();
-const { Exams, ExamSessions, ExamUserAccess, Users, ExamQuestions, Organizations, AdminPermissions, ExamTemplates, ExamTemplateQuestions } = require('../../../models');
+const {
+  Exams,
+  ExamSessions,
+  ExamUserAccess,
+  Users,
+  ExamQuestions,
+  Organizations,
+  Classes,
+  ClassEnrollments,
+  Programs,
+  AdminPermissions,
+  ExamTemplates,
+  ExamTemplateQuestions,
+} = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require('../../../middleware/isAdmin');
+const ROLES = require('../../../utils/roles');
 const { localToUtcISO, DEFAULT_EXAM_TIME_ZONE } = require("../../../utils/timezoneUtils");
 const { Op } = require("sequelize");
 
@@ -34,6 +48,8 @@ router.get('/kpis', auth, isAdmin, async (req, res) => {
     const {
       examId,
       orgId,
+      programId,
+      classId,
       dateFrom,
       dateTo,
       status,
@@ -43,10 +59,30 @@ router.get('/kpis', auth, isAdmin, async (req, res) => {
     // FILTERING
     // -------------------------------
 
+    const classWhere = {};
+
+    if (classId) {
+      classWhere.id = Number(classId);
+    }
+
+    if (programId) {
+      classWhere.program_id = Number(programId);
+    }
+
     const sessionWhere = {};
 
     if (examId) {
       sessionWhere.exam_id = examId;
+    }
+
+    // For new sessions, the stored class_id is authoritative.
+    // NULL is allowed so historical sessions can still use
+    // the legacy class/enrollment relationships below.
+    if (classId) {
+      sessionWhere[Op.or] = [
+        { class_id: Number(classId) },
+        { class_id: null },
+      ];
     }
 
     if (dateFrom || dateTo) {
@@ -150,19 +186,95 @@ router.get('/kpis', auth, isAdmin, async (req, res) => {
 
         include: [
           {
+            model: Exams,
+            as: 'exams',
+            attributes: ['id'],
+
+            required:
+              Object.keys(classWhere).length > 0,
+
+            include: [
+              {
+                model: Classes,
+                as: 'classes',
+                attributes: ['id'],
+                through: {
+                  attributes: [],
+                },
+
+                ...(Object.keys(classWhere).length > 0
+                  ? {
+                      where: classWhere,
+                      required: true,
+                    }
+                  : {
+                      required: false,
+                    }),
+              },
+            ],
+          },
+
+          {
             model: Users,
             as: 'users',
             attributes: [
               'organization_id'
             ],
 
+            include: [
+              ...((classId || programId)
+                ? [
+                    {
+                      model: ClassEnrollments,
+                      as: 'class_enrollments',
+                      attributes: [],
+                      where: {
+                        status: 'enrolled',
+
+                        ...(classId
+                          ? {
+                              class_id:
+                                Number(classId)
+                            }
+                          : {}),
+                      },
+
+                      required: true,
+
+                      ...(programId
+                        ? {
+                            include: [
+                              {
+                                model: Classes,
+                                as: 'class',
+                                attributes: [],
+                                where: {
+                                  program_id:
+                                    Number(programId),
+                                },
+                                required: true,
+                              },
+                            ],
+                          }
+                        : {}),
+                    },
+                  ]
+                : []),
+            ],
+
             ...(Object.keys(userIncludeWhere).length > 0
               ? {
-                  where:
-                    userIncludeWhere
+                  where: userIncludeWhere
                 }
-              : {})
-          }
+              : {}),
+
+            required: Boolean(
+              orgId ||
+              classId ||
+              programId ||
+              Object.keys(userIncludeWhere).length > 0
+            ),
+          },
         ]
 
       });
@@ -252,15 +364,37 @@ router.get('/analytics', auth, isAdmin, async (req, res) => {
     const {
       examId,
       orgId,
+      programId,
+      classId,
       dateFrom,
       dateTo,
       status,
     } = req.query;
 
+    const classWhere = {};
+
+    if (classId) {
+      classWhere.id = Number(classId);
+    }
+
+    if (programId) {
+      classWhere.program_id = Number(programId);
+    }
+
     const sessionWhere = {};
 
     if (examId) {
       sessionWhere.exam_id = examId;
+    }
+
+    // For new sessions, the stored class_id is authoritative.
+    // NULL is allowed so historical sessions can still use
+    // the legacy class/enrollment relationships below.
+    if (classId) {
+      sessionWhere[Op.or] = [
+        { class_id: Number(classId) },
+        { class_id: null },
+      ];
     }
 
     if (dateFrom || dateTo) {
@@ -336,13 +470,91 @@ router.get('/analytics', auth, isAdmin, async (req, res) => {
 
       include: [
         {
+          model: Exams,
+          as: 'exams',
+          attributes: ['id'],
+
+          required:
+            Object.keys(classWhere).length > 0,
+
+          include: [
+            {
+              model: Classes,
+              as: 'classes',
+              attributes: ['id'],
+              through: {
+                attributes: [],
+              },
+
+              ...(Object.keys(classWhere).length > 0
+                ? {
+                    where: classWhere,
+                    required: true,
+                  }
+                : {
+                    required: false,
+                  }),
+            },
+          ],
+        },
+
+        {
           model: Users,
           as: 'users',
           attributes: ['organization_id'],
 
+          include: [
+            ...((classId || programId)
+              ? [
+                  {
+                    model: ClassEnrollments,
+                    as: 'class_enrollments',
+                    attributes: [],
+
+                    where: {
+                      status: 'enrolled',
+
+                      ...(classId
+                        ? {
+                            class_id: Number(classId),
+                          }
+                        : {}),
+                    },
+
+                    required: true,
+
+                    ...(programId
+                      ? {
+                          include: [
+                            {
+                              model: Classes,
+                              as: 'class',
+                              attributes: [],
+                              where: {
+                                program_id: Number(programId),
+                              },
+                              required: true,
+                            },
+                          ],
+                        }
+                      : {}),
+                  },
+                ]
+              : []),
+          ],
+
           ...(Object.keys(userIncludeWhere).length > 0
-            ? { where: userIncludeWhere }
+            ? {
+                where: userIncludeWhere,
+              }
             : {}),
+
+          required: Boolean(
+            orgId ||
+            classId ||
+            programId ||
+            Object.keys(userIncludeWhere).length > 0
+          ),
         },
       ],
     });
@@ -1088,6 +1300,8 @@ router.get('/results', auth, isAdmin, async (req, res) => {
       limit = 50,
       examId,
       orgId,
+      programId,
+      classId,
       dateFrom,
       dateTo,
       status,
@@ -1156,9 +1370,33 @@ router.get('/results', auth, isAdmin, async (req, res) => {
     // -------------------------------
     // FILTERING
     // -------------------------------
+    const classWhere = {};
+
+    if (classId) {
+      classWhere.id = Number(classId);
+    }
+
+    if (programId) {
+      classWhere.program_id = Number(programId);
+    }
+
     const sessionWhere = {};
 
     if (examId) sessionWhere.exam_id = examId;
+
+    // For new sessions, the stored class_id is authoritative.
+    // Historical sessions with class_id = NULL are still allowed
+    // through so the legacy class fallback can evaluate them.
+    if (classId) {
+      sessionWhere[Op.or] = [
+        {
+          class_id: Number(classId),
+        },
+        {
+          class_id: null,
+        },
+      ];
+    }
 
     if (dateFrom || dateTo) {
       sessionWhere.submitted_at = {};
@@ -1175,7 +1413,7 @@ router.get('/results', auth, isAdmin, async (req, res) => {
       sessionWhere.score = {
         [Op.and]: [
           { [Op.ne]: null },
-          { [Op.lt]: 70 }
+          { [Op.lt]: 80 }
         ]
       };
     }
@@ -1221,24 +1459,134 @@ router.get('/results', auth, isAdmin, async (req, res) => {
     // -------------------------------
     const include = [
       {
+        model: Classes,
+        as: 'class',
+        attributes: [
+          'id',
+          'name',
+          'organization_id',
+          'program_id',
+        ],
+        required: false,
+
+        include: [
+          {
+            model: Programs,
+            as: 'program',
+            attributes: [
+              'id',
+              'name',
+              'training_type',
+            ],
+            required: false,
+          },
+        ],
+      },
+      {
         model: Exams,
         as: 'exams',
         attributes: ['id', 'title'],
+        required:
+          Object.keys(classWhere).length > 0,
+        include: [
+          {
+            model: Classes,
+            as: 'classes',
+            attributes: [
+              'id',
+              'name',
+              'organization_id',
+              'program_id',
+            ],
+            through: {
+              attributes: [],
+            },
+
+            include: [
+              {
+                model: Programs,
+                as: 'program',
+                attributes: [
+                  'id',
+                  'name',
+                  'training_type',
+                ],
+              },
+            ],
+
+            ...(Object.keys(classWhere).length > 0
+              ? {
+                  where: classWhere,
+                  required: true,
+                }
+              : {
+                  required: false,
+                }),
+          },
+        ],
       },
       {
         model: Users,
         as: 'users',
-        attributes: ['id', 'first_name', 'last_name', 'email', 'organization_id'],
+        attributes: [
+          'id',
+          'first_name',
+          'last_name',
+          'email',
+          'organization_id'
+        ],
+
         include: [
           {
             model: Organizations,
             as: 'organization',
             attributes: ['id', 'name'],
           },
+
+          ...((classId || programId)
+            ? [
+                {
+                  model: ClassEnrollments,
+                  as: 'class_enrollments',
+                  attributes: [],
+                  where: {
+                    status: 'enrolled',
+                    ...(classId
+                      ? { class_id: Number(classId) }
+                      : {}),
+                  },
+                  required: true,
+
+                  ...(programId
+                    ? {
+                        include: [
+                          {
+                            model: Classes,
+                            as: 'class',
+                            attributes: [],
+                            where: {
+                              program_id: Number(programId),
+                            },
+                            required: true,
+                          },
+                        ],
+                      }
+                    : {}),
+                },
+              ]
+            : []),
         ],
+
         ...(Object.keys(userIncludeWhere).length > 0
           ? { where: userIncludeWhere }
           : {}),
+
+        required: Boolean(
+          orgId ||
+          classId ||
+          programId ||
+          Object.keys(userIncludeWhere).length > 0
+        ),
       },
     ];
 
@@ -1261,16 +1609,63 @@ router.get('/results', auth, isAdmin, async (req, res) => {
       const user = s.users;
       const org = user?.organization;
 
+      // New sessions store their actual class directly.
+      // Historical sessions may have class_id = NULL, so
+      // fall back to the exam's assigned classes.
+      const sessionClass = s.class || null;
+
+      const fallbackClass =
+        !sessionClass
+          ? (
+              exam?.classes?.find(classItem => {
+
+                if (classId) {
+                  return classItem.id === Number(classId);
+                }
+
+                if (programId) {
+                  return classItem.program_id === Number(programId);
+                }
+
+                return true;
+              }) || null
+            )
+          : null;
+
+      const matchedClass =
+        sessionClass || fallbackClass;
+
+      const program =
+        matchedClass?.program || null;
+
       return {
         session_id: s.id,
         exam_id: s.exam_id,
         exam_title: exam ? exam.title : null,
-        organization_id: user ? user.organization_id : null,
-        organization_name: org ? org.name : null,
+
+        organization_id:
+          user ? user.organization_id : null,
+
+        organization_name:
+          org ? org.name : null,
+
+        class_id:
+          matchedClass ? matchedClass.id : null,
+
+        class_name:
+          matchedClass ? matchedClass.name : null,
+
+        program_id:
+          program ? program.id : null,
+
+        program_name:
+          program ? program.name : null,
+
         attempt_number: s.attempt_number,
         score: s.score,
         submitted_at: s.submitted_at,
         active: s.active,
+
         user: {
           id: user.id,
           first_name: user.first_name,
@@ -1325,7 +1720,33 @@ router.get('/sessions/:sessionId/details', auth, isAdmin, async (req, res) => {
             }
           ]
         },
-        { model: Exams, as: 'exams' },
+        {
+          model: Exams,
+          as: 'exams'
+        },
+        {
+          model: Classes,
+          as: 'class',
+          attributes: [
+            'id',
+            'name',
+            'organization_id',
+            'program_id'
+          ],
+          required: false,
+          include: [
+            {
+              model: Programs,
+              as: 'program',
+              attributes: [
+                'id',
+                'name',
+                'training_type'
+              ],
+              required: false
+            }
+          ]
+        },
       ],
     });
 
@@ -1397,6 +1818,22 @@ router.get('/sessions/:sessionId/details', auth, isAdmin, async (req, res) => {
     res.json({
       user: session.users,
       organization: session.users.organization?.name || null,
+
+      class: session.class
+        ? {
+            id: session.class.id,
+            name: session.class.name,
+          }
+        : null,
+
+      program: session.class?.program
+        ? {
+            id: session.class.program.id,
+            name: session.class.program.name,
+            training_type: session.class.program.training_type,
+          }
+        : null,
+
       exam: session.exams,
       score: session.score,
       submitted_at: session.submitted_at,
@@ -1409,7 +1846,334 @@ router.get('/sessions/:sessionId/details', auth, isAdmin, async (req, res) => {
   }
 });
 
-// 📋 View all users with access to an exam
+/**
+ * 📚 GET /api/admin/exams/historical-unassigned/:userId
+ * Super Admin only.
+ * Returns submitted exam sessions for a student
+ * that have not yet been associated with a class.
+ */
+router.get(
+  '/historical-unassigned/:userId',
+  auth,
+  isAdmin,
+  async (req, res) => {
+
+    try {
+
+      // Super Admin only.
+      if (req.user.roleId !== ROLES.SUPER_ADMIN) {
+        return res.status(403).json({
+          message:
+            'Only a Super Admin can manage historical exam assignments.',
+        });
+      }
+
+      const { userId } = req.params;
+
+      const user =
+        await Users.findByPk(
+          userId,
+          {
+            attributes: [
+              'id',
+              'wired_user_id',
+              'first_name',
+              'last_name',
+              'email',
+              'organization_id',
+            ],
+          }
+        );
+
+      if (!user) {
+        return res.status(404).json({
+          message:
+            'Student not found.',
+        });
+      }
+
+      const sessions =
+        await ExamSessions.findAll({
+          where: {
+            user_id: user.id,
+            submitted_at: {
+              [Op.ne]: null,
+            },
+          },
+
+          attributes: [
+            'id',
+            'exam_id',
+            'class_id',
+            'attempt_number',
+            'score',
+            'submitted_at',
+          ],
+
+          include: [
+            {
+              model: Exams,
+              as: 'exams',
+              attributes: [
+                'id',
+                'title',
+                'exam_template_id',
+              ],
+            },
+          ],
+
+          order: [
+            ['submitted_at', 'DESC'],
+          ],
+        });
+
+      return res.status(200).json({
+        user: {
+          id: user.id,
+          wired_user_id:
+            user.wired_user_id,
+          first_name:
+            user.first_name,
+          last_name:
+            user.last_name,
+          email:
+            user.email,
+          organization_id:
+            user.organization_id,
+        },
+
+        sessions: sessions.map(
+          (session) => ({
+            id:
+              session.id,
+
+            exam_id:
+              session.exam_id,
+
+            exam_title:
+              session.exams?.title ?? null,
+
+            exam_template_id:
+              session.exams?.exam_template_id ?? null,
+
+            class_id:
+              session.class_id,
+
+            attempt_number:
+              session.attempt_number,
+
+            score:
+              session.score,
+
+            submitted_at:
+              session.submitted_at,
+          })
+        ),
+      });
+
+    } catch (err) {
+
+      console.error(
+        '❌ Failed to load unassigned historical exam sessions:',
+        err
+      );
+
+      return res.status(500).json({
+        message:
+          'Failed to load unassigned historical exam sessions.',
+      });
+
+    }
+
+  }
+);
+
+/**
+ * 🗂 POST /api/admin/exams/historical-assign
+ * Super Admin only.
+ *
+ * Associates an existing submitted historical exam session
+ * with a class and ensures the exam itself is assigned
+ * to that class.
+ */
+router.post(
+  '/historical-assign',
+  auth,
+  isAdmin,
+  async (req, res) => {
+
+    try {
+
+      if (req.user.roleId !== ROLES.SUPER_ADMIN) {
+        return res.status(403).json({
+          message:
+            'Only a Super Admin can manage historical exam assignments.',
+        });
+      }
+
+      const {
+        sessionId,
+        classId,
+      } = req.body;
+
+      if (!sessionId || !classId) {
+        return res.status(400).json({
+          message:
+            'sessionId and classId are required.',
+        });
+      }
+
+      // Find the historical exam session.
+      const session =
+        await ExamSessions.findByPk(
+          sessionId
+        );
+
+      if (!session) {
+        return res.status(404).json({
+          message:
+            'Exam session not found.',
+        });
+      }
+
+      // Historical reconciliation is only for
+      // completed/submitted exam sessions.
+      if (!session.submitted_at) {
+        return res.status(400).json({
+          message:
+            'Only submitted exam sessions can be assigned historically.',
+        });
+      }
+
+      // Ensure the target class exists.
+      const classRecord =
+        await Classes.findByPk(
+          classId
+        );
+
+      if (!classRecord) {
+        return res.status(404).json({
+          message:
+            'Class not found.',
+        });
+      }
+
+      // The student must already be enrolled in
+      // the historical class being selected.
+      const enrollment =
+        await ClassEnrollments.findOne({
+          where: {
+            user_id:
+              session.user_id,
+            class_id:
+              classRecord.id,
+            status:
+              'enrolled',
+          },
+        });
+
+      if (!enrollment) {
+        return res.status(400).json({
+          message:
+            'The student must be enrolled in this class before the historical exam result can be assigned.',
+        });
+      }
+
+      // Ensure the exam still exists.
+      const exam =
+        await Exams.findByPk(
+          session.exam_id
+        );
+
+      if (!exam) {
+        return res.status(404).json({
+          message:
+            'Exam not found.',
+        });
+      }
+
+      // Historical exams predate class-based exam assignment.
+      // Add the target class to the exam if that relationship
+      // does not already exist.
+      const assignedClasses =
+        await exam.getClasses({
+          where: {
+            id: classRecord.id,
+          },
+          attributes: ['id'],
+        });
+
+      if (assignedClasses.length === 0) {
+        await exam.addClass(
+          classRecord
+        );
+      }
+
+      // Associate this student's historical session
+      // with the class. No assessment data is changed.
+      await session.update({
+        class_id:
+          classRecord.id,
+      });
+
+      return res.status(200).json({
+        message:
+          'Historical exam result assigned successfully.',
+
+        session: {
+          id:
+            session.id,
+
+          exam_id:
+            session.exam_id,
+
+          user_id:
+            session.user_id,
+
+          class_id:
+            session.class_id,
+
+          attempt_number:
+            session.attempt_number,
+
+          score:
+            session.score,
+
+          submitted_at:
+            session.submitted_at,
+        },
+
+        exam_class: {
+          exam_id:
+            exam.id,
+
+          class_id:
+            classRecord.id,
+        },
+      });
+
+    } catch (err) {
+
+      console.error(
+        '❌ Failed to assign historical exam result:',
+        err
+      );
+
+      return res.status(500).json({
+        message:
+          'Failed to assign historical exam result.',
+        error:
+          err.message,
+      });
+
+    }
+
+  }
+);
+
+/**
+ * 📋 View all users with access to an exam
+ */
 router.get('/:examId/access', auth, isAdmin, async (req, res) => {
   const { examId } = req.params;
   try {
@@ -1495,10 +2259,30 @@ router.get('/upcoming', auth, isAdmin, async (req, res) => {
       ],
       include: [
         {
-          model: Organizations,
-          as: 'organizations',
-          attributes: ['id', 'name']
-        }
+          model: Classes,
+          as: 'classes',
+          attributes: [
+            'id',
+            'name',
+            'organization_id',
+            'program_id',
+          ],
+          through: {
+            attributes: [],
+          },
+          include: [
+            {
+              model: Organizations,
+              as: 'organization',
+              attributes: ['id', 'name'],
+            },
+            {
+              model: Programs,
+              as: 'program',
+              attributes: ['id', 'name', 'training_type'],
+            },
+          ],
+        },
       ],
       order: [['available_from', 'ASC']]
     });
@@ -1525,7 +2309,23 @@ router.get('/upcoming', auth, isAdmin, async (req, res) => {
       return {
         id: exam.id,
         title: exam.title,
-        org: exam.organizations?.map(o => o.name).join(', ') || "No organizations assigned",
+        classes: exam.classes?.map((classItem) => ({
+          id: classItem.id,
+          name: classItem.name,
+          organization: classItem.organization
+            ? {
+                id: classItem.organization.id,
+                name: classItem.organization.name,
+              }
+            : null,
+          program: classItem.program
+            ? {
+                id: classItem.program.id,
+                name: classItem.program.name,
+                training_type: classItem.program.training_type,
+              }
+            : null,
+        })) || [],
         duration: `${exam.duration_minutes} min`,
 
         from: exam.available_from,
@@ -1552,8 +2352,9 @@ router.get('/upcoming', auth, isAdmin, async (req, res) => {
 
 /**
  * 📋 GET /api/admin/exams/scheduled
- * Returns all scheduled exams with organizations,
+ * Returns all scheduled exams with assigned classes,
  * participant counts, and status.
+ * Supports filtering by organization, program, and class.
  */
 router.get('/scheduled', auth, isAdmin, async (req, res) => {
 
@@ -1564,6 +2365,8 @@ router.get('/scheduled', auth, isAdmin, async (req, res) => {
       status,
       search,
       organizationId,
+      programId,
+      classId,
       sortBy = "available_from",
       sortOrder = "DESC",
       page = 1,
@@ -1574,13 +2377,35 @@ router.get('/scheduled', auth, isAdmin, async (req, res) => {
 
       include: [
         {
-          model: Organizations,
-          as: 'organizations',
-          attributes: ['id', 'name'],
+          model: Classes,
+          as: 'classes',
+          attributes: [
+            'id',
+            'name',
+            'organization_id',
+            'program_id',
+            'status',
+          ],
           through: {
-            attributes: []
-          }
-        }
+            attributes: [],
+          },
+          include: [
+            {
+              model: Organizations,
+              as: 'organization',
+              attributes: ['id', 'name'],
+            },
+            {
+              model: Programs,
+              as: 'program',
+              attributes: [
+                'id',
+                'name',
+                'training_type',
+              ],
+            },
+          ],
+        },
       ],
 
       order: [
@@ -1649,8 +2474,8 @@ router.get('/scheduled', auth, isAdmin, async (req, res) => {
         duration_minutes:
           exam.duration_minutes,
 
-        organizations:
-          exam.organizations,
+        classes:
+          exam.classes,
 
         participant_count:
           participantMap[exam.id] || 0,
@@ -1685,10 +2510,32 @@ router.get('/scheduled', auth, isAdmin, async (req, res) => {
     if (organizationId) {
       filtered = filtered.filter(
         (exam) =>
-          exam.organizations.some(
-            (org) =>
-              org.id ===
+          exam.classes.some(
+            (classItem) =>
+              classItem.organization_id ===
               Number(organizationId)
+          )
+      );
+    }
+
+    if (programId) {
+      filtered = filtered.filter(
+        (exam) =>
+          exam.classes.some(
+            (classItem) =>
+              classItem.program_id ===
+              Number(programId)
+          )
+      );
+    }
+
+    if (classId) {
+      filtered = filtered.filter(
+        (exam) =>
+          exam.classes.some(
+            (classItem) =>
+              classItem.id ===
+              Number(classId)
           )
       );
     }
@@ -1768,71 +2615,71 @@ router.get('/scheduled', auth, isAdmin, async (req, res) => {
  * 1. Add organization to exam_organization
  * 2. Assign all users of that organization to ExamUserAccess
  */
-router.post('/:examId/assign-org/:orgId', auth, isAdmin, async (req, res) => {
-  const { examId, orgId } = req.params;
+// router.post('/:examId/assign-org/:orgId', auth, isAdmin, async (req, res) => {
+//   const { examId, orgId } = req.params;
 
-  try {
-    // Ensure exam exists
-    const exam = await Exams.findByPk(examId);
-    if (!exam) {
-      return res.status(404).json({ message: 'Exam not found.' });
-    }
+//   try {
+//     // Ensure exam exists
+//     const exam = await Exams.findByPk(examId);
+//     if (!exam) {
+//       return res.status(404).json({ message: 'Exam not found.' });
+//     }
 
-    // Ensure organization exists
-    const org = await Organizations.findByPk(orgId);
-    if (!org) {
-      return res.status(404).json({ message: 'Organization not found.' });
-    }
+//     // Ensure organization exists
+//     const org = await Organizations.findByPk(orgId);
+//     if (!org) {
+//       return res.status(404).json({ message: 'Organization not found.' });
+//     }
 
-    // 1️⃣ Insert into exam_organization (if not exists)
-    await exam.addOrganization(org);
+//     // 1️⃣ Insert into exam_organization (if not exists)
+//     await exam.addOrganization(org);
 
-    // 2️⃣ Fetch all users of this org
-    const users = await Users.findAll({
-      where: { organization_id: orgId },
-      attributes: ['id'],
-    });
+//     // 2️⃣ Fetch all users of this org
+//     const users = await Users.findAll({
+//       where: { organization_id: orgId },
+//       attributes: ['id'],
+//     });
 
-    if (users.length === 0) {
-      return res.json({
-        message: `Organization assigned, but no users found in ${org.name}.`,
-      });
-    }
+//     if (users.length === 0) {
+//       return res.json({
+//         message: `Organization assigned, but no users found in ${org.name}.`,
+//       });
+//     }
 
-    // 3️⃣ Assign users to exam if not already assigned
-    let created = 0;
-    for (const user of users) {
-      const exists = await ExamUserAccess.findOne({
-        where: { exam_id: examId, user_id: user.id },
-      });
+//     // 3️⃣ Assign users to exam if not already assigned
+//     let created = 0;
+//     for (const user of users) {
+//       const exists = await ExamUserAccess.findOne({
+//         where: { exam_id: examId, user_id: user.id },
+//       });
 
-      if (!exists) {
-        await ExamUserAccess.create({
-          exam_id: examId,
-          user_id: user.id,
-          max_attempts: 1,
-          granted_by: req.user.id,
-        });
-        created++;
-      }
-    }
+//       if (!exists) {
+//         await ExamUserAccess.create({
+//           exam_id: examId,
+//           user_id: user.id,
+//           max_attempts: 1,
+//           granted_by: req.user.id,
+//         });
+//         created++;
+//       }
+//     }
 
-    res.json({
-      message: `Organization assigned successfully.`,
-      exam_id: examId,
-      organization_id: orgId,
-      total_users: users.length,
-      newly_assigned: created,
-    });
+//     res.json({
+//       message: `Organization assigned successfully.`,
+//       exam_id: examId,
+//       organization_id: orgId,
+//       total_users: users.length,
+//       newly_assigned: created,
+//     });
 
-  } catch (err) {
-    console.error('❌ Failed to assign org to exam:', err);
-    res.status(500).json({
-      message: 'Failed to assign organization to exam.',
-      error: err.message,
-    });
-  }
-});
+//   } catch (err) {
+//     console.error('❌ Failed to assign org to exam:', err);
+//     res.status(500).json({
+//       message: 'Failed to assign organization to exam.',
+//       error: err.message,
+//     });
+//   }
+// });
 
 /**
  * 🧩 DELETE /api/admin/exams/:examId/organizations/:orgId
@@ -1841,119 +2688,119 @@ router.post('/:examId/assign-org/:orgId', auth, isAdmin, async (req, res) => {
  * 2. Remove all users from that organization
  *    from ExamUserAccess
  */
-router.delete(
-  '/:examId/organizations/:orgId',
-  auth,
-  isAdmin,
-  async (req, res) => {
+// router.delete(
+//   '/:examId/organizations/:orgId',
+//   auth,
+//   isAdmin,
+//   async (req, res) => {
 
-    const { examId, orgId } =
-      req.params;
+//     const { examId, orgId } =
+//       req.params;
 
-    try {
+//     try {
 
-      const exam =
-        await Exams.findByPk(
-          examId
-        );
+//       const exam =
+//         await Exams.findByPk(
+//           examId
+//         );
 
-      if (!exam) {
+//       if (!exam) {
 
-        return res
-          .status(404)
-          .json({
-            message:
-              'Exam not found.'
-          });
+//         return res
+//           .status(404)
+//           .json({
+//             message:
+//               'Exam not found.'
+//           });
 
-      }
+//       }
 
-      const org =
-        await Organizations.findByPk(
-          orgId
-        );
+//       const org =
+//         await Organizations.findByPk(
+//           orgId
+//         );
 
-      if (!org) {
+//       if (!org) {
 
-        return res
-          .status(404)
-          .json({
-            message:
-              'Organization not found.'
-          });
+//         return res
+//           .status(404)
+//           .json({
+//             message:
+//               'Organization not found.'
+//           });
 
-      }
+//       }
 
-      // Remove organization relationship
-      await exam.removeOrganization(
-        org
-      );
+//       // Remove organization relationship
+//       await exam.removeOrganization(
+//         org
+//       );
 
-      // Find all users in organization
-      const users =
-        await Users.findAll({
-          where: {
-            organization_id:
-              orgId
-          },
-          attributes: ['id'],
-        });
+//       // Find all users in organization
+//       const users =
+//         await Users.findAll({
+//           where: {
+//             organization_id:
+//               orgId
+//           },
+//           attributes: ['id'],
+//         });
 
-      const userIds =
-        users.map(
-          user => user.id
-        );
+//       const userIds =
+//         users.map(
+//           user => user.id
+//         );
 
-      // Remove access records
-      const removed =
-        await ExamUserAccess.destroy({
-          where: {
-            exam_id: examId,
-            user_id: userIds,
-          },
-        });
+//       // Remove access records
+//       const removed =
+//         await ExamUserAccess.destroy({
+//           where: {
+//             exam_id: examId,
+//             user_id: userIds,
+//           },
+//         });
 
-      res.json({
+//       res.json({
 
-        message:
-          'Organization removed successfully.',
+//         message:
+//           'Organization removed successfully.',
 
-        exam_id:
-          examId,
+//         exam_id:
+//           examId,
 
-        organization_id:
-          orgId,
+//         organization_id:
+//           orgId,
 
-        users_removed:
-          removed,
+//         users_removed:
+//           removed,
 
-      });
+//       });
 
-    } catch (err) {
+//     } catch (err) {
 
-      console.error(
-        '❌ Failed to remove organization:',
-        err
-      );
+//       console.error(
+//         '❌ Failed to remove organization:',
+//         err
+//       );
 
-      res.status(500).json({
+//       res.status(500).json({
 
-        message:
-          'Failed to remove organization.',
+//         message:
+//           'Failed to remove organization.',
 
-        error:
-          err.message,
+//         error:
+//           err.message,
 
-      });
+//       });
 
-    }
+//     }
 
-  }
-);
+//   }
+// );
 
 /**
  * 📋 GET /api/admin/exams/:examId
- * Get one scheduled exam with organizations and assigned users
+ * Get one scheduled exam with assigned classes and users
  */
 router.get('/:examId', auth, isAdmin, async (req, res) => {
   const { examId } = req.params;
@@ -1962,12 +2809,34 @@ router.get('/:examId', auth, isAdmin, async (req, res) => {
     const exam = await Exams.findByPk(examId, {
       include: [
         {
-          model: Organizations,
-          as: 'organizations',
-          attributes: ['id', 'name'],
+          model: Classes,
+          as: 'classes',
+          attributes: [
+            'id',
+            'name',
+            'organization_id',
+            'program_id',
+            'status',
+          ],
           through: {
-            attributes: []
-          }
+            attributes: [],
+          },
+          include: [
+            {
+              model: Organizations,
+              as: 'organization',
+              attributes: ['id', 'name'],
+            },
+            {
+              model: Programs,
+              as: 'program',
+              attributes: [
+                'id',
+                'name',
+                'training_type',
+              ],
+            },
+          ],
         },
         {
           model: ExamTemplates,
@@ -2013,8 +2882,6 @@ router.get('/:examId', auth, isAdmin, async (req, res) => {
   }
 });
 
-module.exports = router;
-
 /**
  * ✏️ PUT /api/admin/exams/:examId
  * Update basic exam details
@@ -2029,7 +2896,8 @@ router.put('/:examId', auth, isAdmin, async (req, res) => {
     localStart,
     localEnd,
     timeZone,
-    duration_minutes
+    duration_minutes,
+    exam_template_id,
   } = req.body;
 
   try {
@@ -2057,6 +2925,29 @@ router.put('/:examId', auth, isAdmin, async (req, res) => {
         localEnd,
         zone
       );
+    
+    if (
+      exam_template_id !== undefined &&
+      exam_template_id !== null &&
+      Number(exam_template_id) !== Number(exam.exam_template_id)
+    ) {
+      const submittedAttempt = await ExamSessions.findOne({
+        where: {
+          exam_id: exam.id,
+          submitted_at: {
+            [Op.ne]: null,
+          },
+        },
+        attributes: ["id"],
+      });
+
+      if (submittedAttempt) {
+        return res.status(400).json({
+          message:
+            "The exam template cannot be changed because this exam already has submitted attempts.",
+        });
+      }
+    }
 
     await exam.update({
 
@@ -2073,7 +2964,10 @@ router.put('/:examId', auth, isAdmin, async (req, res) => {
       duration_minutes,
 
       time_zone:
-        zone
+        zone,
+
+      exam_template_id:
+        exam_template_id ?? exam.exam_template_id
 
     });
 
@@ -2134,6 +3028,28 @@ router.delete(
           .json({
             message:
               'Exam not found'
+          });
+
+      }
+
+      const submittedAttempt =
+        await ExamSessions.findOne({
+          where: {
+            exam_id: exam.id,
+            submitted_at: {
+              [Op.ne]: null,
+            },
+          },
+          attributes: ['id'],
+        });
+
+      if (submittedAttempt) {
+
+        return res
+          .status(400)
+          .json({
+            message:
+              'This exam cannot be deleted because it has submitted attempts.'
           });
 
       }
@@ -2235,3 +3151,4 @@ router.delete(
   }
 );
 
+module.exports = router;

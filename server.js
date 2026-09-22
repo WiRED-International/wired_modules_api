@@ -3,6 +3,7 @@ const sequelize = require('./config/connection');
 const port = process.env.PORT || 3000;
 const cron = require('node-cron');
 const sendCmeReminderJob = require('./services/email/sendCmeReminderJob');
+const completeExpiredClassesJob = require('./services/classes/completeExpiredClassesJob');
 
 sequelize.sync({ force: false })
   .then(() => {
@@ -17,6 +18,15 @@ sequelize.sync({ force: false })
           await sendCmeReminderJob();
         } catch (err) {
           console.error('❌ CME reminder cron failed:', err);
+        }
+      });
+
+      // Automatically complete classes whose end date has passed.
+      cron.schedule('10 0 * * *', async () => {
+        try {
+          await completeExpiredClassesJob();
+        } catch (err) {
+          console.error('Automatic class completion cron failed:', err);
         }
       });
     });

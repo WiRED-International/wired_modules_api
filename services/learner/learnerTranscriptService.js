@@ -1,10 +1,15 @@
+const { Op } = require("sequelize");
 const {
   QuizScores,
   Modules,
+  Programs,
   Specializations,
   ExamSessions,
   Exams,
   ExamTemplates,
+  Classes,
+  ClassEnrollments,
+  ClassEnrollmentSpecializations,
 } = require("../../models");
 /**
  * Builds a normalized learning transcript for a learner.
@@ -20,6 +25,13 @@ const {
  */
 
 function normalizeCurriculum(module) {
+
+  // Prefer the module's current Program association.
+  const program = module.programs?.[0];
+
+  if (program?.name) {
+    return program.name;
+  }
 
   // Use the new training_type field when available.
   if (module.training_type) {
@@ -64,6 +76,26 @@ function normalizeCurriculum(module) {
 
 }
 
+function normalizeLegacyProgramName(program) {
+  if (!program) {
+    return "Unknown";
+  }
+
+  switch (program.toLowerCase()) {
+    case "basic training":
+      return "Basic CHW";
+
+    case "act":
+      return "Advanced CHW Training (ACT)";
+
+    case "specialization":
+      return "Specialization";
+
+    default:
+      return program;
+  }
+}
+
 async function buildLearnerTranscript(userId) {
 
   const quizScores = await QuizScores.findAll({
@@ -92,6 +124,19 @@ async function buildLearnerTranscript(userId) {
           ],
 
           include: [
+            {
+              model: Programs,
+              as: "programs",
+              attributes: [
+                "id",
+                "name",
+                "training_type",
+              ],
+              through: {
+                attributes: [],
+              },
+              required: false,
+            },
             {
               model: Specializations,
               as: "specializations",
@@ -134,10 +179,20 @@ async function buildLearnerTranscript(userId) {
   }));
 
   const examSessions = await ExamSessions.findAll({
+    attributes: [
+      "id",
+      "user_id",
+      "class_id",
+      "attempt_number",
+      "submitted_at",
+      "score",
+    ],
 
     where: {
       user_id: userId,
-      active: false,
+      submitted_at: {
+        [Op.ne]: null,
+      },
     },
 
     include: [
@@ -160,6 +215,62 @@ async function buildLearnerTranscript(userId) {
           },
         ],
       },
+      {
+        model: Classes,
+        as: "class",
+        attributes: [
+          "id",
+          "name",
+          "program_id",
+        ],
+        required: false,
+        include: [
+          {
+            model: Programs,
+            as: "program",
+            attributes: [
+              "id",
+              "name",
+              "training_type",
+            ],
+            required: false,
+          },
+          {
+            model: ClassEnrollments,
+            as: "class_enrollments",
+            attributes: [
+              "id",
+              "user_id",
+            ],
+            where: {
+              user_id: userId,
+            },
+            required: false,
+            include: [
+              {
+                model: ClassEnrollmentSpecializations,
+                as: "specialization_selection",
+                attributes: [
+                  "id",
+                  "specialization_id",
+                ],
+                required: false,
+                include: [
+                  {
+                    model: Specializations,
+                    as: "specialization",
+                    attributes: [
+                      "id",
+                      "name",
+                    ],
+                    required: false,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
     ],
 
   });
@@ -176,9 +287,24 @@ async function buildLearnerTranscript(userId) {
 
       type: "Exam",
 
-      training: session.exams?.exam_template?.program || "Unknown",
+      attemptNumber: session.attempt_number,
 
-      specializations: [],
+      training:
+        session.class?.program?.name ||
+        normalizeLegacyProgramName(
+          session.exams?.exam_template?.program
+        ),
+
+      specializations:
+        session.class?.class_enrollments?.[0]
+          ?.specialization_selection
+          ?.specialization
+          ? [
+              session.class.class_enrollments[0]
+                .specialization_selection
+                .specialization.name,
+            ]
+          : [],
 
       completedAt: session.submitted_at,
 

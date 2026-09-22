@@ -23,9 +23,15 @@ const emailRoutes = require('./emailRoutes');
 const examSessionsRoutes = require('./examRoutes/examSessionsRoutes');
 const examRoutes = require('./examRoutes/examsRoutes');
 const adminExamTemplatesRoutes = require('./examRoutes/adminExamTemplatesRoutes');
+const adminExamAssignmentRoutes = require('./examRoutes/adminExamAssignmentRoutes');
 const adminExamRoutes = require('./examRoutes/adminExamRoutes');
 const adminOrganizationsRoutes = require('./adminRoutes/adminOrganizationsRoutes');
+const adminLocationsRoutes = require('./adminRoutes/adminLocationsRoutes');
 const classRoutes = require('./adminRoutes/classRoutes');
+const studentClassRoutes = require('./classRoutes/studentClassRoutes');
+const adminClassProgressRoutes = require('./adminRoutes/adminClassProgressRoutes');
+const adminClassSpecializationRoutes = require('./adminRoutes/adminClassSpecializationRoutes');
+const adminCredentialRoutes = require('./adminRoutes/adminCredentialRoutes');
 const cmeCertificateRoutes = require('./certificateRoutes/cmeCertificateRoutes');
 const partnerRoutes = require('./partnerRoutes');
 
@@ -42,11 +48,13 @@ router.use('/modules-to-letters', moduleLetterRoutes);
 router.use('/letters-to-modules', moduleLetterRoutes);
 router.use('/roles', rolesRoutes);
 router.use('/users', userRoutes);
+router.use('/api/users', userRoutes);
 router.use('/auth', authRoutes);
 router.use('/countries', countriesRoutes);
 router.use('/cities', citiesRoutes);
 router.use('/organizations', organizationsRoutes);
 router.use('/admin-permissions', adminPermissionsRoutes);
+router.use('/api/admin-permissions', adminPermissionsRoutes);
 router.use('/quiz-scores', quizScoreRoutes);
 router.use('/api/downloads', downloadsroutes);
 router.use('/leaderboard', leaderboard);
@@ -60,9 +68,15 @@ router.use('/exams', examRoutes);
 // because adminExamRoutes contains parameterized routes
 // such as /:examId that will capture /templates.
 router.use('/api/admin/exams', adminExamTemplatesRoutes);
+router.use('/api/admin/exams', adminExamAssignmentRoutes);
 router.use('/api/admin/exams', adminExamRoutes);
 router.use('/api/admin/organizations', adminOrganizationsRoutes);
+router.use('/api/admin/locations', adminLocationsRoutes);
+router.use('/api/admin/classes', adminClassSpecializationRoutes);
+router.use('/api/admin/classes', adminClassProgressRoutes);
 router.use('/api/admin/classes', classRoutes);
+router.use('/api/admin/credentials', adminCredentialRoutes);
+router.use('/api/classes', studentClassRoutes);
 router.use('/certificates', cmeCertificateRoutes);
 // Partner API
 router.use('/partner/v1', partnerRoutes);

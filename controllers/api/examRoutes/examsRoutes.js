@@ -5,7 +5,8 @@ const {
   ExamQuestions,
   ExamSessions,
   ExamUserAccess,
-  ExamTemplateQuestions
+  ExamTemplateQuestions,
+  ClassEnrollments
 } = require('../../../models');
 const auth = require("../../../middleware/auth");
 const { Op } = require('sequelize');
@@ -260,6 +261,51 @@ router.post('/:id/start-session', auth, async (req, res) => {
       return res.status(403).json({ message: 'Access not granted for this exam' });
     }
 
+    // 🔍 Resolve the class for this exam attempt
+    const assignedClasses = await exam.getClasses({
+      attributes: [
+        'id',
+        'program_id',
+        'organization_id'
+      ],
+      joinTableAttributes: [],
+    });
+
+    let class_id = null;
+
+    if (assignedClasses.length > 0) {
+
+      const assignedClassIds =
+        assignedClasses.map(classItem => classItem.id);
+
+      const enrollments = await ClassEnrollments.findAll({
+        where: {
+          user_id,
+          class_id: {
+            [Op.in]: assignedClassIds,
+          },
+          status: 'enrolled',
+        },
+        attributes: ['class_id'],
+      });
+
+      if (enrollments.length === 0) {
+        return res.status(403).json({
+          message:
+            'You are not enrolled in a class assigned to this exam',
+        });
+      }
+
+      if (enrollments.length > 1) {
+        return res.status(409).json({
+          message:
+            'This exam is assigned to more than one of your classes. The exam class could not be determined.',
+        });
+      }
+
+      class_id = enrollments[0].class_id;
+    }
+
     // 🔍 Check for existing active (unfinished) session
     const activeSession = await ExamSessions.findOne({
       where: {
@@ -291,6 +337,7 @@ router.post('/:id/start-session', auth, async (req, res) => {
     const session = await ExamSessions.create({
       user_id,
       exam_id,
+      class_id,
       attempt_number: attemptCount + 1,
       created_at: now,
       active: true,

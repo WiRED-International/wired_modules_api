@@ -1,5 +1,18 @@
 const router = require("express").Router();
-const { Users, Roles, QuizScores, Modules, Countries, Cities, Organizations, Specializations, AdminPermissions } = require('../../../models');
+const {
+  Users,
+  Roles,
+  QuizScores,
+  Modules,
+  Programs,
+  Countries,
+  Cities,
+  Organizations,
+  Specializations,
+  ClassEnrollments,
+  ClassEnrollmentSpecializations,
+  AdminPermissions,
+} = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require("../../../middleware/isAdmin");
 const { buildUserQueryFilters } = require("../../../middleware/accessControl");
@@ -29,7 +42,7 @@ router.get('/me', auth, async (req, res) => {
             {
               model: Modules,
               as: 'module',
-              attributes: ['id', 'name', 'module_id',],
+              attributes: ['id', 'name', 'module_id', 'credit_type'],
             },
           ],
         },
@@ -131,128 +144,268 @@ router.get("/search", auth, isAdmin, async (req, res) => {
 
 router.get("/:userId/learning-progress", auth, isAdmin, async (req, res) => {
   try {
+    const targetUserId = Number(req.params.userId);
+    const requester = req.user;
+
+    if (!Number.isSafeInteger(targetUserId) || targetUserId <= 0) {
+      return res.status(400).json({
+        message: "Valid userId is required.",
+      });
+    }
+
+    const targetUser = await Users.findByPk(targetUserId, {
+      attributes: [
+        "id",
+        "organization_id",
+        "role_id",
+      ],
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({
+        message: "User not found.",
+      });
+    }
+
+    if (requester.roleId === ROLES.ADMIN) {
+      if (requester.id !== targetUserId) {
+        const adminPermissions = await AdminPermissions.findAll({
+          where: {
+            admin_id: requester.id,
+          },
+          attributes: ["organization_id"],
+        });
+
+        const allowedOrgIds = adminPermissions.map(
+          (permission) => permission.organization_id
+        );
+
+        if (!allowedOrgIds.includes(targetUser.organization_id)) {
+          return res.status(403).json({
+            message:
+              "Access denied. You can only view users within your assigned organizations.",
+          });
+        }
+
+        if (targetUser.role_id !== ROLES.USER) {
+          return res.status(403).json({
+            message:
+              "Access denied. Admins can only view users with role 'User'.",
+          });
+        }
+      }
+    }
 
     const { userId } = req.params;
 
-    const quizScores = await QuizScores.findAll({
+    // Load the specialization selections this student has made
+    // through their class enrollments.
+    const specializationSelections =
+      await ClassEnrollmentSpecializations.findAll({
+        include: [
+          {
+            model: ClassEnrollments,
+            as: "class_enrollment",
+            attributes: ["id", "user_id", "class_id"],
+            where: {
+              user_id: userId,
+            },
+            required: true,
+          },
+          {
+            model: Specializations,
+            as: "specialization",
+            attributes: ["id", "name"],
+            required: true,
+          },
+        ],
+      });
+
+    // Get the unique specializations this student has selected.
+    const selectedSpecializationIds = [
+      ...new Set(
+        specializationSelections.map(
+          (selection) => selection.specialization.id
+        )
+      ),
+    ];
+
+    // Load those specializations with their assigned modules.
+    let selectedSpecializations = [];
+
+    if (selectedSpecializationIds.length > 0) {
+      selectedSpecializations = await Specializations.findAll({
+        where: {
+          id: {
+            [Op.in]: selectedSpecializationIds,
+          },
+        },
+        attributes: [
+          "id",
+          "name",
+        ],
+        include: [
+          {
+            model: Modules,
+            as: "modules",
+            attributes: [
+              "id",
+              "module_id",
+              "name",
+              "has_quiz",
+            ],
+            through: {
+              attributes: [],
+            },
+          },
+        ],
+        order: [["name", "ASC"]],
+      });
+    }
+
+    // Load the Basic and ACT programs with their assigned modules.
+    const programs = await Programs.findAll({
       where: {
-        user_id: userId,
+        training_type: {
+          [Op.in]: ["basic", "act"],
+        },
       },
       attributes: [
         "id",
-        "score",
-        "date_taken",
+        "name",
+        "training_type",
       ],
       include: [
         {
           model: Modules,
-          as: "module",
+          as: "modules",
           attributes: [
             "id",
             "module_id",
             "name",
-            "training_type",
-            "credit_type",
-            "categories",
+            "has_quiz",
           ],
+          through: {
+            attributes: [],
+          },
         },
       ],
     });
 
-    function calculateProgress({
-      quizScores,
-      totalModules,
-      isMatch,
-      passingScore = 80,
-    }) {
-      const completedModuleIds = new Set();
+    const basicProgram = programs.find(
+      (program) => program.training_type === "basic"
+    );
 
-      quizScores.forEach((qs) => {
+    const actProgram = programs.find(
+      (program) => program.training_type === "act"
+    );
+
+    // Only modules with an assessment count toward progress.
+    const basicAssessedModules = (basicProgram?.modules ?? []).filter(
+      (module) => module.has_quiz
+    );
+
+    const actAssessedModules = (actProgram?.modules ?? []).filter(
+      (module) => module.has_quiz
+    );
+
+    // Get the assessed modules for the student's selected specializations.
+    const specializationAssessedModules =
+      selectedSpecializations.flatMap((specialization) =>
+        (specialization.modules ?? []).filter(
+          (module) => module.has_quiz
+        )
+      );
+
+    // Get all assessed module IDs relevant to Basic, ACT,
+    // and the student's selected specializations.
+    const assessedModuleIds = [
+      ...new Set([
+        ...basicAssessedModules.map((module) => module.id),
+        ...actAssessedModules.map((module) => module.id),
+        ...specializationAssessedModules.map(
+          (module) => module.id
+        ),
+      ]),
+    ];
+
+    // Load this student's quiz scores only for assessed
+    // Basic, ACT, and selected specialization modules.
+    let quizScores = [];
+
+    if (assessedModuleIds.length > 0) {
+      quizScores = await QuizScores.findAll({
+        where: {
+          user_id: userId,
+          module_id: {
+            [Op.in]: assessedModuleIds,
+          },
+        },
+        attributes: [
+          "id",
+          "module_id",
+          "score",
+          "date_taken",
+        ],
+      });
+    }
+
+    function calculateProgress(modules) {
+      const moduleIds = new Set(
+        modules.map((module) => module.id)
+      );
+
+      const passedModuleIds = new Set();
+
+      quizScores.forEach((quizScore) => {
         if (
-          qs.score >= passingScore &&
-          qs.module &&
-          isMatch(qs.module)
+          quizScore.score >= 80 &&
+          moduleIds.has(quizScore.module_id)
         ) {
-          completedModuleIds.add(qs.module.id);
+          passedModuleIds.add(quizScore.module_id);
         }
       });
 
-      const completed = completedModuleIds.size;
+      const completed = passedModuleIds.size;
+      const total = modules.length;
 
       return {
         completed,
-        total: totalModules,
+        total,
         percent:
-          totalModules > 0
-            ? Number(((completed / totalModules) * 100).toFixed(2))
+          total > 0
+            ? Number(((completed / total) * 100).toFixed(2))
             : 0,
       };
     }
 
-    const basicTraining = calculateProgress({
-      quizScores,
-      totalModules: 28,
-      isMatch: (module) =>
-        module.training_type === "basic" ||
-        (
-          Array.isArray(module.categories) &&
-          module.categories.includes("basic")
-        ),
-    });
+    const basicTraining = calculateProgress(
+      basicAssessedModules
+    );
 
-    const act = calculateProgress({
-      quizScores,
-      totalModules: 18,
-      isMatch: (module) =>
-        module.training_type === "act",
-    });
+    const act = calculateProgress(
+      actAssessedModules
+    );
 
-    // const specializationRecords = await Specializations.findAll({
-    //   attributes: ["id", "name"],
-    //   include: [
-    //     {
-    //       model: Modules,
-    //       as: "modules",
-    //       attributes: ["id"],
-    //       through: {
-    //         attributes: [],
-    //       },
-    //     },
-    //   ],
-    //   order: [["name", "ASC"]],
-    // });
+    const specializations = selectedSpecializations.map(
+      (specialization) => {
+        const assessedModules = (
+          specialization.modules ?? []
+        ).filter((module) => module.has_quiz);
 
-    // specializationRecords.forEach((specialization) => {
-    //   console.log(
-    //     specialization.name,
-    //     specialization.modules.length
-    //   );
-    // });
-
-    // const specializations = specializationRecords.map((specialization) => {
-    //   const specializationModuleIds = new Set(
-    //     specialization.modules.map((module) => module.id)
-    //   );
-
-    //   const progress = calculateProgress({
-    //     quizScores,
-    //     totalModules: specializationModuleIds.size,
-    //     isMatch: (module) =>
-    //       specializationModuleIds.has(module.id),
-    //   });
-
-    //   return {
-    //     id: specialization.id,
-    //     name: specialization.name,
-    //     ...progress,
-    //   };
-    // });
+        return {
+          id: specialization.id,
+          name: specialization.name,
+          ...calculateProgress(assessedModules),
+        };
+      }
+    );
 
     return res.json({
       basicTraining,
       act,
+      specializations,
     });
-
   } catch (err) {
     console.error(err);
 
@@ -643,6 +796,45 @@ router.get("/:id/transcript", auth, isAdmin, async (req, res) => {
       return res.status(404).json({
         message: "User not found",
       });
+    }
+
+    // SUPER ADMIN → full access
+    if (requester.roleId !== ROLES.SUPER_ADMIN) {
+
+      // ADMIN → limited access
+      if (requester.roleId === ROLES.ADMIN) {
+
+        // Admins may always view their own transcript.
+        if (requester.id !== targetUserId) {
+
+          const adminPermissions = await AdminPermissions.findAll({
+            where: {
+              admin_id: requester.id,
+            },
+            attributes: [
+              "organization_id",
+            ],
+          });
+
+          const allowedOrgIds = adminPermissions.map(
+            (permission) => permission.organization_id
+          );
+
+          if (!allowedOrgIds.includes(user.organization_id)) {
+            return res.status(403).json({
+              message:
+                "Access denied. You can only view users within your assigned organizations.",
+            });
+          }
+
+          if (user.role_id !== ROLES.USER) {
+            return res.status(403).json({
+              message:
+                "Access denied. Admins can only view users with role 'User'.",
+            });
+          }
+        }
+      }
     }
 
     const transcript = await buildLearnerTranscript(targetUserId);

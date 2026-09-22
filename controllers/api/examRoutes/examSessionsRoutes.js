@@ -1,9 +1,18 @@
 const express = require('express');
 const router = require("express").Router();
-const { Users, Exams, ExamSessions, ExamQuestions, ExamTemplateQuestions } = require('../../../models');
+const {
+  Users,
+  Exams,
+  ExamSessions,
+  ExamQuestions,
+  ExamTemplateQuestions,
+  Classes,
+  Programs
+} = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require("../../../middleware/isAdmin");
 const { calculateScore } = require("../../../utils/examUtils");
+const issueCredential = require('../../../services/credentials/issueCredential');
 
 // This route allows the user to submit their answers.
 router.put('/:id/submit', auth, async (req, res) => {
@@ -120,6 +129,22 @@ router.put('/:id/submit', auth, async (req, res) => {
 
     console.log(`✅ Exam session ${session.id} submitted successfully.`);
 
+    // Attempt WiRED credential issuance only for a passing,
+    // class-associated exam session.
+    if (score >= 80 && session.class_id != null) {
+      try {
+        await issueCredential({
+          userId: user_id,
+          classId: session.class_id,
+        });
+      } catch (credentialError) {
+        console.error(
+          `Credential issuance failed for exam session ${session.id}:`,
+          credentialError
+        );
+      }
+    }
+
     // 8️⃣ Return success response
     res.status(200).json({
       message: 'Exam submitted successfully',
@@ -142,14 +167,59 @@ router.get('/exam-sessions/:id/details', auth, isAdmin, async (req, res) => {
   try {
     const session = await ExamSessions.findByPk(id, {
       include: [
-        { model: Users, as: 'users', attributes: ['id', 'first_name', 'last_name', 'email'] },
-        { model: Exams, as: 'exams', attributes: ['id', 'title', 'exam_template_id'] }
+        {
+          model: Users,
+          as: 'users',
+          attributes: [
+            'id',
+            'first_name',
+            'last_name',
+            'email'
+          ]
+        },
+        {
+          model: Exams,
+          as: 'exams',
+          attributes: [
+            'id',
+            'title',
+            'exam_template_id'
+          ]
+        },
+        {
+          model: Classes,
+          as: 'class',
+          attributes: [
+            'id',
+            'name',
+            'organization_id',
+            'program_id'
+          ],
+          required: false,
+          include: [
+            {
+              model: Programs,
+              as: 'program',
+              attributes: [
+                'id',
+                'name',
+                'training_type'
+              ],
+              required: false
+            }
+          ]
+        }
       ]
     });
 
     if (!session) {
       return res.status(404).json({ message: 'Exam session not found' });
     }
+
+    console.log(
+      "SESSION CLASS TEST:",
+      JSON.stringify(session.class, null, 2)
+    );
 
     let questions = [];
 

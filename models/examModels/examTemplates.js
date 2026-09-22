@@ -23,6 +23,16 @@ ExamTemplates.init(
       allowNull: false,
       defaultValue: "Basic Training"
     },
+    exam_type: {
+      type: DataTypes.ENUM(
+        'general',
+        'basic_qualifying',
+        'act_final',
+        'specialization_final'
+      ),
+      allowNull: true,
+      defaultValue: null,
+    },
   },
   {
     sequelize,

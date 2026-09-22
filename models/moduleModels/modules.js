@@ -59,6 +59,12 @@ Modules.init(
             type: DataTypes.ENUM('basic', 'act', 'specialization'),
             allowNull: true,
         },
+        has_quiz: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: true,
+            comment: 'Indicates whether the learning module contains a final quiz',
+        },
         credit_type: {
             type: DataTypes.ENUM('none', 'cme'),
             allowNull: false,

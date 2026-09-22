@@ -1,5 +1,12 @@
 const router = require('express').Router();
-const { QuizScores, Modules } = require('../../../models');
+const {
+  QuizScores,
+  Modules,
+  Programs,
+  Classes,
+  ClassEnrollments,
+  ClassEnrollmentSpecializations,
+} = require('../../../models');
 const auth = require('../../../middleware/auth');
 const isAdmin = require('../../../middleware/isAdmin');
 const ROLES = require('../../../utils/roles');
@@ -8,6 +15,60 @@ const { Users } = require('../../../models');
 const { Op } = require('sequelize');
 const { CmeCertificates } = require('../../../models');
 const issueCmeCertificate = require('../../../services/certificates/issueCmeCertificate');
+const saveHighestQuizScore = require('../../../services/quizScores/saveHighestQuizScore');
+const issueCredential = require('../../../services/credentials/issueCredential');
+
+async function issueCredentialsForModule({ userId, module }) {
+  // Find every formal-training program containing this module.
+  const programs = await module.getPrograms({
+    attributes: ['id', 'training_type'],
+    through: { attributes: [] },
+  });
+
+  const trainingProgramIds = programs
+    .filter((program) =>
+      ['basic', 'act', 'specialization'].includes(program.training_type)
+    )
+    .map((program) => program.id);
+
+  if (trainingProgramIds.length === 0) {
+    return;
+  }
+
+  // Scores carry forward, so check every relevant class enrollment.
+  const enrollments = await ClassEnrollments.findAll({
+    where: {
+      user_id: userId,
+    },
+    include: [
+      {
+        model: Classes,
+        as: 'class',
+        required: true,
+        where: {
+          program_id: {
+            [Op.in]: trainingProgramIds,
+          },
+        },
+        attributes: ['id', 'program_id'],
+      },
+    ],
+  });
+
+  for (const enrollment of enrollments) {
+    try {
+      await issueCredential({
+        userId,
+        classId: enrollment.class_id,
+      });
+    } catch (error) {
+      console.error(
+        `Credential issuance failed for user ${userId}, class ${enrollment.class_id}:`,
+        error
+      );
+    }
+  }
+}
 
 router.get('/', auth, async (req, res) => {
   const { userId } = req.query;
@@ -104,18 +165,22 @@ router.get('/:id', auth, async (req, res) => {
 
 router.post('/', auth, async (req, res) => {
   try {
-    const { module_id, user_id, score, date_taken } = req.body;
+    const { module_id, score, date_taken } = req.body;
 
-    if (module_id == null || user_id == null || score == null) {
-      return res.status(400).json({ message: 'module_id, user_id, and score are required' });
+    if (module_id == null || score == null) {
+      return res.status(400).json({
+        message: 'module_id and score are required'
+      });
     }
 
-    // Ensure user_id and score are valid numbers
-    const parsedUserId = parseInt(user_id, 10);
+    // The authenticated user is always the owner of the submitted score.
+    const parsedUserId = req.user.id;
     const parsedScore = parseFloat(score);
 
-    if (isNaN(parsedUserId) || isNaN(parsedScore)) {
-      return res.status(400).json({ message: 'Invalid user_id or score' });
+    if (isNaN(parsedScore)) {
+      return res.status(400).json({
+        message: 'Invalid score'
+      });
     }
 
     // Find the module by the `module_id` field (not the primary key)
@@ -127,13 +192,124 @@ router.post('/', auth, async (req, res) => {
 
     const resolvedModuleId = module.id;
 
-    // Use UPSERT instead of findOne + save() to prevent race conditions
-    const [quizScore, created] = await QuizScores.upsert({
-      module_id: resolvedModuleId,
-      user_id: parsedUserId,
-      score: parsedScore,
-      date_taken: date_taken || new Date(),
-    });
+    // Formal training modules require the appropriate class enrollment.
+    // CME modules do not require class enrollment.
+    if (module.credit_type !== 'cme') {
+      const programs = await module.getPrograms({
+        attributes: ['id', 'name', 'training_type'],
+        through: { attributes: [] },
+      });
+
+      const trainingProgram = programs.find(
+        (program) =>
+          program.training_type === 'basic' ||
+          program.training_type === 'act' ||
+          program.training_type === 'specialization'
+      );
+
+      if (trainingProgram) {
+        const enrollment = await ClassEnrollments.findOne({
+          where: {
+            user_id: parsedUserId,
+          },
+          include: [
+            {
+              model: Classes,
+              as: 'class',
+              required: true,
+              where: {
+                program_id: trainingProgram.id,
+              },
+              attributes: ['id', 'name', 'program_id'],
+            },
+          ],
+        });
+
+        if (!enrollment) {
+          return res.status(403).json({
+            message: `You must be enrolled in a ${trainingProgram.name} class before submitting this quiz score.`,
+          });
+        }
+
+        // Specialization modules must also belong to the student's
+        // selected specialization for that class enrollment.
+        if (trainingProgram.training_type === 'specialization') {
+          const specializationSelection =
+            await ClassEnrollmentSpecializations.findOne({
+              where: {
+                class_enrollment_id: enrollment.id,
+              },
+            });
+
+          if (!specializationSelection) {
+            return res.status(403).json({
+              message:
+                'You must select a specialization before submitting this quiz score.',
+            });
+          }
+
+          const moduleSpecializations = await module.getSpecializations({
+            attributes: ['id'],
+            through: { attributes: [] },
+          });
+
+          const moduleBelongsToSelectedSpecialization =
+            moduleSpecializations.some(
+              (specialization) =>
+                specialization.id === specializationSelection.specialization_id
+            );
+
+          if (!moduleBelongsToSelectedSpecialization) {
+            return res.status(403).json({
+              message:
+                'This module does not belong to your selected specialization.',
+            });
+          }
+        }
+      }
+    }
+
+    let quizScore;
+    let created;
+
+    if (module.credit_type !== 'cme') {
+      const result = await saveHighestQuizScore({
+        userId: parsedUserId,
+        moduleId: resolvedModuleId,
+        score: parsedScore,
+        dateTaken: new Date(date_taken || Date.now()),
+      });
+
+      quizScore = result.quizScore;
+      created = result.created;
+    } else {
+      // Preserve the existing CME score-saving behavior.
+      [quizScore, created] = await QuizScores.upsert({
+        module_id: resolvedModuleId,
+        user_id: parsedUserId,
+        score: parsedScore,
+        date_taken: date_taken || new Date(),
+      });
+    }
+
+    // Recheck WiRED credentials after a passing formal-training score.
+    // A lower retake does not erase an earlier passing best score.
+    if (
+      module.credit_type !== 'cme' &&
+      quizScore.score >= 80
+    ) {
+      try {
+        await issueCredentialsForModule({
+          userId: parsedUserId,
+          module,
+        });
+      } catch (credentialError) {
+        console.error(
+          `Credential recheck failed for user ${parsedUserId}, module ${resolvedModuleId}:`,
+          credentialError
+        );
+      }
+    }
 
     // 🧠 CME logic — 5 credits for score ≥ 80 only if module.credit_type === 'cme'
     // 🧠 CME logic — award credits once per module per year
@@ -220,6 +396,7 @@ router.post('/', auth, async (req, res) => {
 
   } catch (err) {
     console.error('Sequelize error stack:', err.stack);
+    console.error('Database error:', err.parent || err.original);
     res.status(500).json({
       message: 'Internal Server Error',
       errors: err.errors || [],

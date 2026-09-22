@@ -28,6 +28,16 @@ ExamSessions.init(
                 key: 'id'
             },
         },
+        class_id: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            references: {
+                model: 'classes',
+                key: 'id'
+            },
+            onUpdate: 'CASCADE',
+            onDelete: 'SET NULL'
+        },
         attempt_number: {
             type: DataTypes.INTEGER,
             allowNull: false

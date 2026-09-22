@@ -30,6 +30,15 @@ Classes.init(
       },
     },
 
+    location_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'locations',
+        key: 'id',
+      },
+    },
+
     name: {
       type: DataTypes.STRING,
       allowNull: false,

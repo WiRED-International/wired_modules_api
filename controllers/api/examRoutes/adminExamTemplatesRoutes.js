@@ -11,6 +11,33 @@ const {
   ExamSessions
 } = require('../../../models');
 
+const EXAM_TYPE_PROGRAMS = {
+  basic_qualifying: 'Basic Training',
+  act_final: 'ACT',
+  specialization_final: 'Specialization',
+};
+
+const VALID_EXAM_TYPES = [
+  'general',
+  'basic_qualifying',
+  'act_final',
+  'specialization_final',
+];
+
+function validateExamType(examType, program) {
+  if (!VALID_EXAM_TYPES.includes(examType)) {
+    return 'A valid exam type is required.';
+  }
+
+  const requiredProgram = EXAM_TYPE_PROGRAMS[examType];
+
+  if (requiredProgram && program !== requiredProgram) {
+    return `${examType} must belong to ${requiredProgram}.`;
+  }
+
+  return null;
+}
+
 // =====================================================
 // TEMPLATE ROUTES
 // =====================================================
@@ -39,14 +66,33 @@ router.post('/templates', auth, isSuperAdmin, async (req, res) => {
 
   const {
     title,
-    description
+    description,
+    program,
+    exam_type
   } = req.body;
 
   try {
 
+    const requiredProgram =
+      EXAM_TYPE_PROGRAMS[exam_type];
+
+    const selectedProgram =
+      requiredProgram || program || 'Basic Training';
+
+    const validationError =
+      validateExamType(exam_type, selectedProgram);
+
+    if (validationError) {
+      return res.status(400).json({
+        message: validationError,
+      });
+    }
+
     const template = await ExamTemplates.create({
       title,
-      description
+      description,
+      program: selectedProgram,
+      exam_type,
     });
 
     res.status(201).json({
@@ -201,6 +247,7 @@ router.put('/templates/:templateId', auth, isSuperAdmin, async (req, res) => {
     title,
     description,
     program,
+    exam_type
   } = req.body;
 
   try {
@@ -209,9 +256,17 @@ router.put('/templates/:templateId', auth, isSuperAdmin, async (req, res) => {
       await ExamTemplates.findByPk(templateId);
 
     if (!template) {
-
       return res.status(404).json({
         message: 'Template not found',
+      });
+    }
+
+    const validationError =
+      validateExamType(exam_type, program);
+
+    if (validationError) {
+      return res.status(400).json({
+        message: validationError,
       });
     }
 
@@ -219,6 +274,7 @@ router.put('/templates/:templateId', auth, isSuperAdmin, async (req, res) => {
       title,
       description,
       program,
+      exam_type,
     });
 
     res.json({

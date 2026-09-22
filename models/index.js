@@ -8,13 +8,15 @@ const Packages = require('./moduleModels/packages');
 
 const Countries = require('./userModels/countries');
 const Cities = require('./userModels/cities');
+const Locations = require('./userModels/locations');
 const Organizations = require('./userModels/organizations');
+const OrganizationCountries = require('./userModels/organizationCountries');
 const Roles = require('./userModels/roles');
 const Users = require('./userModels/users');
 const AdminPermissions = require('./userModels/adminPermissions');
 const Specializations = require('./userModels/specializations');
 const CmeCertificates = require('./userModels/cmeCertificates');
-
+const Credentials = require('./userModels/credentials');
 
 const Exams = require('./examModels/exams');
 const ExamQuestions = require('./examModels/examQuestions');
@@ -23,9 +25,10 @@ const ExamTemplateQuestions = require('./examModels/examTemplateQuestions');
 const ExamSessions = require('./examModels/examSessions');
 const ExamUserAccess = require('./examModels/examUserAccess');
 
-const Programs = require('./userModels/Programs');
-const Classes = require('./userModels/Classes');
-const ClassEnrollments = require('./userModels/ClassEnrollments');
+const Programs = require('./userModels/programs');
+const Classes = require('./userModels/classes');
+const ClassEnrollments = require('./userModels/classEnrollments');
+const ClassEnrollmentSpecializations = require('./userModels/classEnrollmentSpecializations');
 
 const Alerts = require('./alerts');
 
@@ -57,6 +60,21 @@ ExamSessions.belongsTo(Users, { as: 'users', foreignKey: 'user_id' });
 // 🎓 PROGRAMS & CLASSES
 // ===============================
 
+// Program -> Modules
+Programs.belongsToMany(Modules, {
+  as: 'modules',
+  through: 'program_modules',
+  foreignKey: 'program_id',
+  otherKey: 'module_id',
+});
+
+Modules.belongsToMany(Programs, {
+  as: 'programs',
+  through: 'program_modules',
+  foreignKey: 'module_id',
+  otherKey: 'program_id',
+});
+
 // Program -> Classes
 Programs.hasMany(Classes, {
   as: 'classes',
@@ -77,6 +95,17 @@ Organizations.hasMany(Classes, {
 Classes.belongsTo(Organizations, {
   as: 'organization',
   foreignKey: 'organization_id',
+});
+
+// Location -> Classes
+Locations.hasMany(Classes, {
+  as: 'classes',
+  foreignKey: 'location_id',
+});
+
+Classes.belongsTo(Locations, {
+  as: 'location',
+  foreignKey: 'location_id',
 });
 
 // User (creator) -> Classes
@@ -124,6 +153,87 @@ ClassEnrollments.belongsTo(Classes, {
   foreignKey: 'class_id',
 });
 
+// Class Enrollment -> Specialization Selection
+ClassEnrollments.hasOne(ClassEnrollmentSpecializations, {
+  as: 'specialization_selection',
+  foreignKey: 'class_enrollment_id',
+});
+
+ClassEnrollmentSpecializations.belongsTo(ClassEnrollments, {
+  as: 'class_enrollment',
+  foreignKey: 'class_enrollment_id',
+});
+
+// Specialization -> Enrollment Selections
+Specializations.hasMany(ClassEnrollmentSpecializations, {
+  as: 'class_enrollment_specializations',
+  foreignKey: 'specialization_id',
+});
+
+ClassEnrollmentSpecializations.belongsTo(Specializations, {
+  as: 'specialization',
+  foreignKey: 'specialization_id',
+});
+
+// ===============================
+// 🎓 WIRED CREDENTIALS
+// ===============================
+
+Users.hasMany(Credentials, {
+  as: 'credentials',
+  foreignKey: 'user_id',
+});
+
+Credentials.belongsTo(Users, {
+  as: 'user',
+  foreignKey: 'user_id',
+});
+
+Classes.hasMany(Credentials, {
+  as: 'credentials',
+  foreignKey: 'class_id',
+});
+
+Credentials.belongsTo(Classes, {
+  as: 'class',
+  foreignKey: 'class_id',
+});
+
+Programs.hasMany(Credentials, {
+  as: 'credentials',
+  foreignKey: 'program_id',
+});
+
+Credentials.belongsTo(Programs, {
+  as: 'program',
+  foreignKey: 'program_id',
+});
+
+Specializations.hasMany(Credentials, {
+  as: 'credentials',
+  foreignKey: 'specialization_id',
+});
+
+Credentials.belongsTo(Specializations, {
+  as: 'specialization',
+  foreignKey: 'specialization_id',
+});
+
+ExamSessions.hasMany(Credentials, {
+  as: 'credentials',
+  foreignKey: 'exam_session_id',
+});
+
+Credentials.belongsTo(ExamSessions, {
+  as: 'exam_session',
+  foreignKey: 'exam_session_id',
+});
+
+Credentials.belongsTo(Users, {
+  as: 'revoked_by_user',
+  foreignKey: 'revoked_by_user_id',
+});
+
 // ===============================
 // 🧾 CME CERTIFICATES
 // ===============================
@@ -146,6 +256,11 @@ ExamQuestions.belongsTo(Exams, { as: 'exams', foreignKey: 'exam_id' });
 Exams.hasMany(ExamSessions, { as: 'exam_sessions', foreignKey: 'exam_id' });
 ExamSessions.belongsTo(Exams, { as: 'exams', foreignKey: 'exam_id' });
 
+// Exam Session -> Class
+ExamSessions.belongsTo(Classes, { as: 'class', foreignKey: 'class_id' });
+
+Classes.hasMany(ExamSessions, { as: 'exam_sessions', foreignKey: 'class_id' });
+
 Exams.hasMany(ExamUserAccess, { as: 'exam_user_access', foreignKey: 'exam_id' });
 ExamUserAccess.belongsTo(Exams, { as: 'exams', foreignKey: 'exam_id' });
 
@@ -155,6 +270,13 @@ ExamUserAccess.belongsTo(Users, { as: 'users', foreignKey: 'user_id' });
 ExamUserAccess.belongsTo(Users, { as: 'granted_by_user', foreignKey: 'granted_by' });
 
 Exams.belongsToMany(Organizations, { as: 'organizations', through: 'exam_organization', foreignKey: 'exam_id', otherKey: 'organization_id', });
+
+// Exam -> Classes
+Exams.belongsToMany(Classes, { as: 'classes', through: 'exam_class', foreignKey: 'exam_id', otherKey: 'class_id', });
+
+
+// Class -> Exams
+Classes.belongsToMany(Exams, { as: 'exams', through: 'exam_class', foreignKey: 'class_id', otherKey: 'exam_id', });
 
 // ===============================
 // 🧠 EXAM TEMPLATE ASSOCIATIONS
@@ -230,18 +352,41 @@ AdminPermissions.belongsTo(Roles, { as: 'role', foreignKey: 'role_id' });
 // ===============================
 // 🌍 COUNTRY-CITY-ORG RELATIONSHIPS
 // ===============================
+
+// Country -> Locations
+Countries.hasMany(Locations, {
+  as: 'locations',
+  foreignKey: 'country_id',
+});
+
+Locations.belongsTo(Countries, {
+  as: 'country',
+  foreignKey: 'country_id',
+});
+
+// Location hierarchy
+Locations.hasMany(Locations, {
+  as: 'child_locations',
+  foreignKey: 'parent_location_id',
+});
+
+Locations.belongsTo(Locations, {
+  as: 'parent_location',
+  foreignKey: 'parent_location_id',
+});
+
 Countries.hasMany(Cities, { as: 'cities', foreignKey: 'country_id' });
 Cities.belongsTo(Countries, { as: 'country', foreignKey: 'country_id' });
 
 Countries.belongsToMany(Organizations, {
-  through: 'organization_countries',   // join table name
+  through: OrganizationCountries,
   foreignKey: 'country_id',
   otherKey: 'organization_id',
   as: 'organizations',
 });
 
 Organizations.belongsToMany(Countries, {
-  through: 'organization_countries',
+  through: OrganizationCountries,
   foreignKey: 'organization_id',
   otherKey: 'country_id',
   as: 'countries',
@@ -275,7 +420,9 @@ module.exports = {
   Alerts,
   Countries,
   Cities,
+  Locations,
   Organizations,
+  OrganizationCountries,
   Roles,
   Users,
   AdminPermissions,
@@ -289,7 +436,9 @@ module.exports = {
   ExamSessions,
   ExamUserAccess,
   CmeCertificates,
+  Credentials,
   Programs,
   Classes,
   ClassEnrollments,
+  ClassEnrollmentSpecializations,
 };
