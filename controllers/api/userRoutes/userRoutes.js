@@ -18,7 +18,7 @@ const isAdmin = require("../../../middleware/isAdmin");
 const { buildUserQueryFilters } = require("../../../middleware/accessControl");
 const { Op, Sequelize } = require("sequelize");
 const ROLES = require("../../../utils/roles")
-const calculateCmeCredits = require('../../../services/certificates/calculateCmeCredits');
+const calculateCmeCreditsBulk = require("../../../services/certificates/calculateCmeCreditsBulk");
 
 const sortAscend = 'ASC';
 const sortDescend = 'DESC';
@@ -430,6 +430,7 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
     sortBy,
     sortOrder,
     roleId,
+    organizationId,
   } = req.query;
 
   try {
@@ -475,6 +476,9 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
         ...AND,
         buildBroadSearch(query),
         roleId ? { role_id: parseInt(roleId, 10) } : {},
+        organizationId
+          ? { organization_id: parseInt(organizationId, 10) }
+          : {},
       ],
     };
 
@@ -511,41 +515,117 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
       case "city.name":
         order.push([{ model: Cities, as: "city" }, "name", direction]);
         break;
-      case "CME_Credits":
+      case "previousYearCmeCredits":
+      case "currentYearCmeCredits":
+        // These are calculated after the database query,
+        // so they are sorted after the users are fetched.
         break;
       case "email":
+        order.push(["email", direction]);
+        break;
+
       case "first_name":
+        order.push(["first_name", direction]);
+        order.push(["last_name", direction]);
+        break;
+
       case "last_name":
-        order.push([sortBy, direction]);
+        order.push(["last_name", direction]);
+        order.push(["first_name", direction]);
         break;
       default:
         order.push(["last_name", "ASC"]);
     }
 
+    const isCmeSort =
+      sortBy === "previousYearCmeCredits" ||
+      sortBy === "currentYearCmeCredits";
+
     const effectiveSortBy =
       sortBy || "last_name";
 
-    const extraOrderCol =
-      ["email", "first_name", "last_name"].includes(effectiveSortBy)
-        ? [effectiveSortBy]
-        : [];
+    let extraOrderCol = [];
+
+    if (effectiveSortBy === "first_name") {
+      extraOrderCol = ["first_name", "last_name"];
+    } else if (effectiveSortBy === "last_name") {
+      extraOrderCol = ["last_name", "first_name"];
+    } else if (effectiveSortBy === "email") {
+      extraOrderCol = ["email"];
+    }
 
     // ── Step 1: Fetch distinct user IDs ───────────────────────────────
-    const userIdRows = await Users.findAll({
-      where,
-      include: includeBase,
-      attributes: [
-        [Sequelize.fn("DISTINCT", Sequelize.col("Users.id")), "id"],
-        ...extraOrderCol.map((col) => Sequelize.col(`Users.${col}`)),
-      ],
-      order,
-      limit,
-      offset,
-      raw: true,
-      subQuery: false,
-    });
+    let userIds;
 
-    const userIds = userIdRows.map((r) => r.id);
+    if (isCmeSort) {
+      // CME values are calculated fields, so we need all matching
+      // user IDs before sorting and pagination.
+      const allUserIdRows = await Users.findAll({
+        where,
+        include: includeBase,
+        attributes: [
+          [Sequelize.fn("DISTINCT", Sequelize.col("Users.id")), "id"],
+        ],
+        raw: true,
+        subQuery: false,
+      });
+
+      const allUserIds = allUserIdRows.map((r) => Number(r.id));
+
+      const currentYear = new Date().getFullYear();
+      const previousYear = currentYear - 1;
+
+      const cmeYear =
+        sortBy === "previousYearCmeCredits"
+          ? previousYear
+          : currentYear;
+
+      const cmeResults = await calculateCmeCreditsBulk(
+        allUserIds,
+        cmeYear
+      );
+
+      allUserIds.sort((a, b) => {
+        const aCredits =
+          cmeResults.get(a)?.credits ?? 0;
+
+        const bCredits =
+          cmeResults.get(b)?.credits ?? 0;
+
+        if (aCredits === bCredits) {
+          // Stable, deterministic secondary sort.
+          return a - b;
+        }
+
+        return direction === "DESC"
+          ? bCredits - aCredits
+          : aCredits - bCredits;
+      });
+
+      // Only fetch the users belonging to the requested page.
+      userIds = allUserIds.slice(
+        offset,
+        offset + limit
+      );
+    } else {
+      // Normal database-backed sorting can still be paginated
+      // directly in MySQL.
+      const userIdRows = await Users.findAll({
+        where,
+        include: includeBase,
+        attributes: [
+          [Sequelize.fn("DISTINCT", Sequelize.col("Users.id")), "id"],
+          ...extraOrderCol.map((col) => Sequelize.col(`Users.${col}`)),
+        ],
+        order,
+        limit,
+        offset,
+        raw: true,
+        subQuery: false,
+      });
+
+      userIds = userIdRows.map((r) => r.id);
+    }
     if (userIds.length === 0)
       return res.status(200).json({ users: [], totalUsers: 0, page, rowsPerPage: limit, pageCount: 0 });
 
@@ -554,15 +634,6 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
       where: { id: { [Op.in]: userIds } },
       include: [
         ...includeBase,
-        {
-          model: QuizScores,
-          as: "quizScores",
-          attributes: ["score", "date_taken"],
-          include: [
-            { model: Modules, as: "module", attributes: ["id", "name", "module_id", "credit_type", "cme_credits", "categories"] },
-          ],
-          required: false,
-        },
         { model: Specializations, as: "specializations", attributes: ["name"], required: false },
       ],
       order,
@@ -570,53 +641,60 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
       attributes: ["id", "first_name", "last_name", "email"],
     });
 
-    // ── Step 3: Compute derived fields ───────────────────────────────
-    const TOTAL_BASIC_MODULES = 28;
-    const currentYear = new Date().getFullYear();
-
-    for (const user of users) {
-      const quizScores = user.quizScores || [];
-
-      // ✅ Basic Training completion percent
-      const completedBasics = quizScores.filter(
-        (qs) =>
-          qs.score >= 80 &&
-          Array.isArray(qs.module?.categories) &&
-          qs.module.categories.includes("basic")
-      ).length;
-      const percent =
-        TOTAL_BASIC_MODULES > 0
-          ? (completedBasics / TOTAL_BASIC_MODULES) * 100
-          : 0;
-      user.setDataValue(
-        "basicCompletionPercent",
-        parseFloat(percent.toFixed(2))
+    if (isCmeSort) {
+      const userOrder = new Map(
+        userIds.map((id, index) => [Number(id), index])
       );
 
-      
-
-      // ✅ CME credits (calculated once and attached to the model)
-      const { credits: cmeCredits } = await calculateCmeCredits(
-        user.id,
-        currentYear
-      );
-
-      user.setDataValue("CME_Credits", cmeCredits);
-    }
-
-    // ── Step 4: Sort by CME_Credits if requested ─────────────────────
-    if (sortBy === "CME_Credits") {
       users.sort((a, b) => {
-        const aCredits = a.getDataValue("CME_Credits") || 0;
-        const bCredits = b.getDataValue("CME_Credits") || 0;
-        return sortOrder.toUpperCase() === "DESC"
-          ? bCredits - aCredits
-          : aCredits - bCredits;
+        return (
+          userOrder.get(Number(a.id)) -
+          userOrder.get(Number(b.id))
+        );
       });
     }
 
-    // ── Step 5: Cached total count ───────────────────────────────
-    const cacheKey = JSON.stringify({ query, roleId, userRole: user.roleId });
+    // ── Step 3: Compute derived fields ───────────────────────────────
+    const currentYear = new Date().getFullYear();
+    const previousYear = currentYear - 1;
+
+    const previousYearCme = await calculateCmeCreditsBulk(
+      userIds,
+      previousYear
+    );
+
+    const currentYearCme = await calculateCmeCreditsBulk(
+      userIds,
+      currentYear
+    );
+
+    for (const user of users) {
+      // ✅ CME credits for previous and current year
+      const previousYearCmeCredits =
+        previousYearCme.get(Number(user.id))?.credits ?? 0;
+
+      const currentYearCmeCredits =
+        currentYearCme.get(Number(user.id))?.credits ?? 0;
+
+      user.setDataValue(
+        "previousYearCmeCredits",
+        previousYearCmeCredits
+      );
+
+      user.setDataValue(
+        "currentYearCmeCredits",
+        currentYearCmeCredits
+      );
+    }
+
+    // ── Step 4: Cached total count ───────────────────────────────
+    const cacheKey = JSON.stringify({
+      query,
+      roleId,
+      organizationId,
+      userRole: user.roleId,
+      userId: user.id,
+    });
     const cached = countCache.get(cacheKey);
     let totalUsers;
 
