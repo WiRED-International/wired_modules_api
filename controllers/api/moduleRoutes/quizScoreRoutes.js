@@ -1,4 +1,6 @@
 const router = require('express').Router();
+const sequelize = require('../../../config/connection');
+
 const {
   QuizScores,
   Modules,
@@ -6,6 +8,7 @@ const {
   Classes,
   ClassEnrollments,
   ClassEnrollmentSpecializations,
+  CmeCreditAwards,
 } = require('../../../models');
 const auth = require('../../../middleware/auth');
 const isAdmin = require('../../../middleware/isAdmin');
@@ -177,6 +180,14 @@ router.post('/', auth, async (req, res) => {
     const parsedUserId = req.user.id;
     const parsedScore = parseFloat(score);
 
+    const parsedDateTaken = date_taken ? new Date(date_taken) : new Date();
+
+    if (Number.isNaN(parsedDateTaken.getTime())) {
+      return res.status(400).json({
+        message: 'Invalid date_taken',
+      });
+    }
+
     if (isNaN(parsedScore)) {
       return res.status(400).json({
         message: 'Invalid score'
@@ -277,7 +288,7 @@ router.post('/', auth, async (req, res) => {
         userId: parsedUserId,
         moduleId: resolvedModuleId,
         score: parsedScore,
-        dateTaken: new Date(date_taken || Date.now()),
+        dateTaken: parsedDateTaken,
       });
 
       quizScore = result.quizScore;
@@ -288,7 +299,7 @@ router.post('/', auth, async (req, res) => {
         module_id: resolvedModuleId,
         user_id: parsedUserId,
         score: parsedScore,
-        date_taken: date_taken || new Date(),
+        date_taken: parsedDateTaken,
       });
     }
 
@@ -311,82 +322,114 @@ router.post('/', auth, async (req, res) => {
       }
     }
 
-    // 🧠 CME logic — 5 credits for score ≥ 80 only if module.credit_type === 'cme'
     // 🧠 CME logic — award credits once per module per year
     let credits_awarded = 0;
     const passed = parsedScore >= 80;
 
-    const firstPassThisYear = await QuizScores.count({
-      where: {
-        user_id: parsedUserId,
-        module_id: resolvedModuleId,
-        score: { [Op.gte]: 80 },
-        date_taken: {
-          [Op.between]: [
-            new Date(`${new Date().getFullYear()}-01-01`),
-            new Date(`${new Date().getFullYear()}-12-31`),
-          ],
-        },
-      },
-    });
+    const cmeYear = parsedDateTaken.getFullYear();
 
-    if (passed && module.credit_type === 'cme' && firstPassThisYear === 1) {
-      credits_awarded = 5;
+    let certificateToEmail = null;
+    let certificateUser = null;
 
-      const user = await Users.findByPk(parsedUserId);
-      if (!user) {
-        throw new Error('User not found for CME update');
-      }
+    if (passed && module.credit_type === 'cme') {
+      const transaction = await sequelize.transaction();
 
-      const currentYear = new Date().getFullYear();
-
-      // Year rollover (lazy reset)
-      if (user.cme_year !== currentYear) {
-        user.cme_year = currentYear;
-        user.cme_credits = 0;
-        user.cme_certificate_issued_at = null;
-      }
-
-      const previousCredits = user.cme_credits;
-      user.cme_credits += credits_awarded;
-
-      // 🎓 Certificate trigger (once per year)
-      if (
-        previousCredits < 50 &&
-        user.cme_credits >= 50 &&
-        !user.cme_certificate_issued_at
-      ) {
-        user.cme_certificate_issued_at = new Date();
-
-        try {
-          const year = new Date().getFullYear();
-
-          // ✅ CREATE the certificate record (ONCE)
-          const certificate = await issueCmeCertificate({
-            user_id: user.id,
-            year,
-            issued_at: new Date(),
+      try {
+        const [cmeAward, cmeAwardCreated] =
+          await CmeCreditAwards.findOrCreate({
+            where: {
+              user_id: parsedUserId,
+              module_id: resolvedModuleId,
+              year: cmeYear,
+            },
+            defaults: {
+              credits_awarded: module.cme_credits,
+              awarded_at: new Date(),
+            },
+            transaction,
           });
 
-          // keep user flag (useful, but not the source of truth)
-          user.cme_certificate_issued_at = certificate.issued_at;
+        if (!cmeAwardCreated) {
+          await transaction.rollback();
+        } else {
+          credits_awarded = cmeAward.credits_awarded;
 
-          // ✅ Send email using the REAL certificate
-          await sendCme50AchievedEmail(user, certificate);
+          const user = await Users.findByPk(parsedUserId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
 
-        } catch (emailErr) {
-          console.error(
-            `❌ CME certificate email failed for user ${user.id} (${user.email})`,
-            emailErr
-          );
+          if (!user) {
+            throw new Error('User not found for CME update');
+          }
+
+          const currentYear = new Date().getFullYear();
+
+          let previousCredits = user.cme_credits;
+
+          if (cmeYear === currentYear) {
+            // Year rollover (lazy reset)
+            if (user.cme_year !== currentYear) {
+              user.cme_year = currentYear;
+              user.cme_credits = 0;
+              user.cme_certificate_issued_at = null;
+            }
+
+            previousCredits = user.cme_credits;
+            user.cme_credits += credits_awarded;
+          }
+
+          // 🎓 Certificate trigger (once per year)
+          if (
+            cmeYear === currentYear &&
+            previousCredits < 50 &&
+            user.cme_credits >= 50 &&
+            !user.cme_certificate_issued_at
+          ) {
+            user.cme_certificate_issued_at = new Date();
+
+            const year = new Date().getFullYear();
+
+            const certificate = await issueCmeCertificate({
+              user_id: user.id,
+              year,
+              issued_at: new Date(),
+              transaction,
+            });
+
+            user.cme_certificate_issued_at = certificate.issued_at;
+
+            certificateToEmail = certificate;
+            certificateUser = user;
+          }
+
+          await user.save({ transaction });
+          await transaction.commit();
         }
-      }
+      } catch (error) {
+        if (!transaction.finished) {
+          await transaction.rollback();
+        }
 
-      await user.save();
+        throw error;
+      }
+    }
+
+    if (certificateToEmail && certificateUser) {
+      try {
+        await sendCme50AchievedEmail(certificateUser, certificateToEmail);
+      } catch (emailErr) {
+        console.error(
+          `❌ CME certificate email failed for user ${certificateUser.id} (${certificateUser.email})`,
+          emailErr
+        );
+      }
     }
 
     res.status(created ? 201 : 200).json({
-      message: created ? 'Quiz Score created successfully' : 'Quiz Score updated successfully',
+      message: created
+        ? 'Quiz Score created successfully'
+        : 'Quiz Score updated successfully',
       quizScore,
       passed,
       credits_awarded,
@@ -394,15 +437,16 @@ router.post('/', auth, async (req, res) => {
       module_name: module.name,
     });
 
-  } catch (err) {
-    console.error('Sequelize error stack:', err.stack);
-    console.error('Database error:', err.parent || err.original);
-    res.status(500).json({
-      message: 'Internal Server Error',
-      errors: err.errors || [],
+      } catch (err) {
+        console.error('Sequelize error stack:', err.stack);
+        console.error('Database error:', err.parent || err.original);
+
+        res.status(500).json({
+          message: 'Internal Server Error',
+          errors: err.errors || [],
+        });
+      }
     });
-  }
-});
 
 router.put('/:id', auth, isAdmin, async (req, res) => {
   const { id } = req.params;

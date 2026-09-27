@@ -16,6 +16,8 @@ const Users = require('./userModels/users');
 const AdminPermissions = require('./userModels/adminPermissions');
 const Specializations = require('./userModels/specializations');
 const CmeCertificates = require('./userModels/cmeCertificates');
+const CmeCreditAwards = require('./userModels/cmeCreditAwards');
+const CmeCreditBalances = require('./userModels/cmeCreditBalances');
 const Credentials = require('./userModels/credentials');
 
 const Exams = require('./examModels/exams');
@@ -247,6 +249,38 @@ CmeCertificates.belongsTo(Users, {
   foreignKey: 'user_id',
 });
 
+// CME Credit Award History
+
+Users.hasMany(CmeCreditAwards, {
+  as: 'cme_credit_awards',
+  foreignKey: 'user_id',
+});
+
+CmeCreditAwards.belongsTo(Users, {
+  as: 'user',
+  foreignKey: 'user_id',
+});
+
+Users.hasMany(CmeCreditBalances, {
+  as: 'cme_credit_balances',
+  foreignKey: 'user_id'
+});
+
+CmeCreditBalances.belongsTo(Users, {
+  as: 'user',
+  foreignKey: 'user_id'
+});
+
+Modules.hasMany(CmeCreditAwards, {
+  as: 'cme_credit_awards',
+  foreignKey: 'module_id',
+});
+
+CmeCreditAwards.belongsTo(Modules, {
+  as: 'module',
+  foreignKey: 'module_id',
+});
+
 // ===============================
 // 🧮 EXAM-RELATED ASSOCIATIONS
 // ===============================
@@ -436,6 +470,8 @@ module.exports = {
   ExamSessions,
   ExamUserAccess,
   CmeCertificates,
+  CmeCreditAwards,
+  CmeCreditBalances,
   Credentials,
   Programs,
   Classes,

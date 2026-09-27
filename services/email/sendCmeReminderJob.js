@@ -2,6 +2,7 @@
 
 const { Users } = require('../../models');
 const { sendCmeReminderEmail } = require('./index');
+const calculateCmeCredits = require('../certificates/calculateCmeCredits');
 
 async function sendCmeReminderJob() {
   const today = new Date();
@@ -16,17 +17,29 @@ async function sendCmeReminderJob() {
   const currentYear = today.getFullYear();
 
   try {
-    const users = await Users.findAll({
-      where: {
-        cme_year: currentYear,
-        cme_reminder_sent_at: null,
-      },
-    });
+    const users = await Users.findAll();
 
     if (!users.length) return;
 
-    // ✅ Only users under 50 CME credits
-    const eligibleUsers = users.filter(user => user.cme_credits < 50);
+    // ✅ Determine eligibility from the authoritative annual CME ledger
+    const eligibleUsers = [];
+
+    for (const user of users) {
+      const reminderSentThisYear =
+        user.cme_reminder_sent_at &&
+        new Date(user.cme_reminder_sent_at).getFullYear() === currentYear;
+
+      if (reminderSentThisYear) {
+        continue;
+      }
+
+      const { credits } = await calculateCmeCredits(user.id, currentYear);
+
+      if (credits < 50) {
+        eligibleUsers.push(user);
+      }
+    }
+
     if (!eligibleUsers.length) return;
 
     // ✅ One email per user, fault-isolated

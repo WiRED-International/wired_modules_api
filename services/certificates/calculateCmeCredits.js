@@ -1,43 +1,51 @@
-const { QuizScores, Modules } = require('../../models');
-const { Op, fn, col, literal } = require('sequelize');
+const {
+  CmeCreditAwards,
+  CmeCreditBalances,
+} = require('../../models');
 
 /**
- * Calculates CME credits dynamically for a user/year
+ * Calculates CME credits for a user/year.
  *
- * Rules:
- * - score >= 80
- * - module.credit_type === 'cme'
- * - each module counts once per year
- * - 5 credits per module
+ * Total CME credits consist of:
+ * - opening_credits: credits earned before the CME award ledger became active
+ * - ledger awards: CME credits awarded after the ledger became active
  */
 async function calculateCmeCredits(userId, year) {
-  const start = new Date(`${year}-01-01T00:00:00Z`);
-  const end = new Date(`${year}-12-31T23:59:59Z`);
-
-  const passedModules = await QuizScores.findAll({
-    where: {
-      user_id: userId,
-      score: { [Op.gte]: 80 },
-      date_taken: { [Op.between]: [start, end] },
-    },
-    include: [
-      {
-        model: Modules,
-        as: 'module',
-        attributes: [],
-        where: { credit_type: 'cme' },
+  const [balance, awards] = await Promise.all([
+    CmeCreditBalances.findOne({
+      where: {
+        user_id: userId,
+        year,
       },
-    ],
-    attributes: [
-      [fn('COUNT', fn('DISTINCT', col('QuizScores.module_id'))), 'module_count'],
-    ],
-    raw: true,
-  });
+      attributes: ['opening_credits'],
+    }),
 
-  const moduleCount = Number(passedModules[0]?.module_count || 0);
-  const credits = moduleCount * 5;
+    CmeCreditAwards.findAll({
+      where: {
+        user_id: userId,
+        year,
+      },
+      attributes: ['module_id', 'credits_awarded'],
+    }),
+  ]);
 
-  return { moduleCount, credits };
+  const openingCredits = balance?.opening_credits ?? 0;
+
+  const awardedCredits = awards.reduce(
+    (total, award) => total + award.credits_awarded,
+    0
+  );
+
+  const moduleCount = awards.filter(
+    (award) => award.credits_awarded > 0
+  ).length;
+
+  return {
+    moduleCount,
+    openingCredits,
+    awardedCredits,
+    credits: openingCredits + awardedCredits,
+  };
 }
 
 module.exports = calculateCmeCredits;

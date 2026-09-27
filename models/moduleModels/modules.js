@@ -71,6 +71,21 @@ Modules.init(
             defaultValue: 'cme',
             comment: 'Determines whether module awards CME credits on passing'
         },
+        cme_credits: {
+          type: DataTypes.INTEGER,
+          allowNull: false,
+          defaultValue: 5,
+          validate: {
+            isInt: {
+              msg: 'CME credits must be a whole number.',
+            },
+            min: {
+              args: [1],
+              msg: 'CME credits must be at least 1.',
+            },
+          },
+          comment: 'Number of CME credits awarded when the module is passed',
+        },
         categories: {
             type: DataTypes.JSON,
             allowNull: true,

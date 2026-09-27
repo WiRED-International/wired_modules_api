@@ -29,6 +29,7 @@ router.get('/', async (req, res) => {
         'packageSize',
         'type',
         'credit_type',
+        'cme_credits',
         'categories',
       ],
       include: [
@@ -65,7 +66,7 @@ router.get('/', async (req, res) => {
 router.get('/names', async (req, res) => {
   try {
     const modules = await Modules.findAll({
-      attributes: ['id', 'module_id', 'name', 'credit_type', 'categories'],
+      attributes: ['id', 'module_id', 'name', 'credit_type', 'cme_credits', 'categories'],
       order: [['name', 'ASC']], 
     });
     res.status(200).json(modules);
@@ -106,8 +107,35 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-    const { name, module_id, description, version, downloadLink, language, packageSize, redirect_module_id, type, credit_type, categories, } = req.body;
+    const {
+      name,
+      module_id,
+      description,
+      version,
+      downloadLink,
+      language,
+      packageSize,
+      redirect_module_id,
+      type,
+      credit_type,
+      cme_credits,
+      categories,
+    } = req.body;
   try {
+
+    if (
+      cme_credits !== undefined &&
+      (
+        cme_credits === '' ||
+        cme_credits === null ||
+        !Number.isInteger(Number(cme_credits)) ||
+        Number(cme_credits) < 1
+      )
+    ) {
+      return res.status(400).json({
+        message: 'CME credits must be a positive whole number.',
+      });
+    }
 
     const newModule = await Modules.create({
         name,
@@ -120,6 +148,7 @@ router.post('/', async (req, res) => {
         redirect_module_id,
         type,
         credit_type,
+        cme_credits,
         categories,
       });
 
@@ -130,8 +159,36 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
-    const { name, module_id, description, version, downloadLink, language, packageSize, redirect_module_id, type, credit_type, categories } = req.body;
+    const {
+      name,
+      module_id,
+      description,
+      version,
+      downloadLink,
+      language,
+      packageSize,
+      redirect_module_id,
+      type,
+      credit_type,
+      cme_credits,
+      categories,
+    } = req.body;
   try {
+
+    if (
+      cme_credits !== undefined &&
+      (
+        cme_credits === '' ||
+        cme_credits === null ||
+        !Number.isInteger(Number(cme_credits)) ||
+        Number(cme_credits) < 1
+      )
+    ) {
+      return res.status(400).json({
+        message: 'CME credits must be a positive whole number.',
+      });
+    }
+
     const module = await Modules.findByPk(req.params.id);
     if (!module) {
       return res.status(404).json({ message: 'Module not found' });
@@ -147,6 +204,7 @@ router.put('/:id', async (req, res) => {
         redirect_module_id,
         type,
         credit_type,
+        cme_credits,
         categories,
     });
 

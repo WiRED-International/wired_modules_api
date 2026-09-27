@@ -18,7 +18,7 @@ const isAdmin = require("../../../middleware/isAdmin");
 const { buildUserQueryFilters } = require("../../../middleware/accessControl");
 const { Op, Sequelize } = require("sequelize");
 const ROLES = require("../../../utils/roles")
-const { calculateCmeCredits } = require('../../../utils/calculateCmeCredits');
+const calculateCmeCredits = require('../../../services/certificates/calculateCmeCredits');
 
 const sortAscend = 'ASC';
 const sortDescend = 'DESC';
@@ -559,7 +559,7 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
           as: "quizScores",
           attributes: ["score", "date_taken"],
           include: [
-            { model: Modules, as: "module", attributes: ["id", "name", "module_id", "credit_type", "categories"] },
+            { model: Modules, as: "module", attributes: ["id", "name", "module_id", "credit_type", "cme_credits", "categories"] },
           ],
           required: false,
         },
@@ -596,7 +596,11 @@ router.get("/search/broad", auth, isAdmin, async (req, res) => {
       
 
       // ✅ CME credits (calculated once and attached to the model)
-      const cmeCredits = calculateCmeCredits(quizScores, currentYear);
+      const { credits: cmeCredits } = await calculateCmeCredits(
+        user.id,
+        currentYear
+      );
+
       user.setDataValue("CME_Credits", cmeCredits);
     }
 
@@ -687,7 +691,7 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
             {
               model: Modules,
               as: 'module',
-              attributes: ['name', 'module_id', 'categories', 'credit_type',],
+              attributes: ['id', 'name', 'module_id', 'categories', 'credit_type', 'cme_credits'],
             },
           ],
         },

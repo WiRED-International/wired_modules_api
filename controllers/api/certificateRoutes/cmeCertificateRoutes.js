@@ -32,19 +32,7 @@ router.post('/issue', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // 🔒 STEP 3 — Enforce 50 CME credits (dynamic)
-    const { credits, moduleCount } = await calculateCmeCredits(user_id, year);
-
-    if (credits < 50) {
-      return res.status(403).json({
-        message: 'User has not met CME credit requirement',
-        required: 50,
-        earned: credits,
-        qualifying_modules: moduleCount,
-      });
-    }
-
-    // 🔒 STEP 4A — Idempotency guard
+    // 🔒 STEP 3 — Idempotency guard
     const existing = await CmeCertificates.findOne({
       where: { user_id, year },
     });
@@ -53,6 +41,17 @@ router.post('/issue', auth, async (req, res) => {
       return res.status(200).json({
         message: 'Certificate already issued for this user/year',
         certificate: existing,
+      });
+    }
+
+    // 🔒 STEP 4 — Enforce 50 CME credits
+    const { credits } = await calculateCmeCredits(user_id, year);
+
+    if (credits < 50) {
+      return res.status(403).json({
+        message: 'User has not met CME credit requirement',
+        required: 50,
+        earned: credits,
       });
     }
 

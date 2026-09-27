@@ -10,8 +10,9 @@ async function issueCmeCertificate({
   year,
   issued_at,
   pdf_path = null,
+  transaction = null,
 }) {
-  return sequelize.transaction(async (t) => {
+  const createCertificate = async (t) => {
     // 🔒 Lock latest certificate for this year
     const lastCert = await CmeCertificates.findOne({
       where: { year },
@@ -40,7 +41,13 @@ async function issueCmeCertificate({
     );
 
     return certificate;
-  });
+  };
+
+  if (transaction) {
+    return createCertificate(transaction);
+  }
+
+  return sequelize.transaction(createCertificate);
 }
 
 module.exports = issueCmeCertificate;
