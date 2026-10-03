@@ -322,7 +322,7 @@ router.post('/', auth, async (req, res) => {
       }
     }
 
-    // 🧠 CME logic — award credits once per module per year
+    // 🧠 CME logic — award credits once per module per user, ever
     let credits_awarded = 0;
     const passed = parsedScore >= 80;
 
@@ -335,23 +335,29 @@ router.post('/', auth, async (req, res) => {
       const transaction = await sequelize.transaction();
 
       try {
-        const [cmeAward, cmeAwardCreated] =
-          await CmeCreditAwards.findOrCreate({
-            where: {
+        // A CME module may award credit only once per user, ever.
+        const existingCmeAward = await CmeCreditAwards.findOne({
+          where: {
+            user_id: parsedUserId,
+            module_id: resolvedModuleId,
+          },
+          transaction,
+        });
+
+        if (existingCmeAward) {
+          await transaction.rollback();
+        } else {
+          const cmeAward = await CmeCreditAwards.create(
+            {
               user_id: parsedUserId,
               module_id: resolvedModuleId,
               year: cmeYear,
-            },
-            defaults: {
               credits_awarded: module.cme_credits,
               awarded_at: new Date(),
             },
-            transaction,
-          });
+            { transaction }
+          );
 
-        if (!cmeAwardCreated) {
-          await transaction.rollback();
-        } else {
           credits_awarded = cmeAward.credits_awarded;
 
           const user = await Users.findByPk(parsedUserId, {
