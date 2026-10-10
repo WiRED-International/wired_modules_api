@@ -2,6 +2,7 @@ const Modules = require('./moduleModels/modules');
 const SubCategories = require('./moduleModels/subCategories');
 const Categories = require('./moduleModels/categories');
 const Letters = require('./moduleModels/letters');
+const Keywords = require('./moduleModels/keywords');
 const QuizScores = require('./moduleModels/quizScores');
 const Downloads = require('./moduleModels/downloads');
 const Packages = require('./moduleModels/packages');
@@ -349,6 +350,10 @@ SubCategories.belongsToMany(Modules, { as: 'modules', through: 'module_subcatego
 Modules.belongsToMany(Letters, { as: 'letters', through: 'module_letter', foreignKey: 'module_id' });
 Letters.belongsToMany(Modules, { as: 'modules', through: 'module_letter', foreignKey: 'letter_id' });
 
+// Module -> Keywords
+Modules.belongsToMany(Keywords, { as: 'keywords', through: 'module_keywords', foreignKey: 'module_id', otherKey: 'keyword_id',});
+Keywords.belongsToMany(Modules, { as: 'modules', through: 'module_keywords', foreignKey: 'keyword_id', otherKey: 'module_id',});
+
 Modules.belongsToMany(Specializations, {
   as: 'specializations',
   through: 'module_specializations',
@@ -451,6 +456,7 @@ module.exports = {
   SubCategories,
   Categories,
   Letters,
+  Keywords,
   Alerts,
   Countries,
   Cities,

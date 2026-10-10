@@ -40,6 +40,18 @@ Modules.init(
             type: DataTypes.STRING,
             allowNull: true
         },
+        content_updated_at: {
+            type: DataTypes.DATEONLY,
+            allowNull: true,
+            defaultValue: null,
+            comment: 'Date the educational content was last revised',
+        },
+        package_uploaded_at: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            defaultValue: null,
+            comment: 'Date the current module ZIP was published',
+        },
         redirect_module_id: {
             type: DataTypes.INTEGER,
             allowNull: true, 
@@ -73,8 +85,8 @@ Modules.init(
         },
         cme_credits: {
           type: DataTypes.INTEGER,
-          allowNull: false,
-          defaultValue: 5,
+          allowNull: true,
+          defaultValue: null,
           validate: {
             isInt: {
               msg: 'CME credits must be a whole number.',
