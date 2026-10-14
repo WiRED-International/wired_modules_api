@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const fetchModuleList = require('../../../services/modules/fetchModuleList');
 
 const { Op } = require('sequelize');
 const auth = require('../../../middleware/auth');
@@ -22,6 +23,30 @@ const {
 } = require('../../../services/s3/s3Client');
 
 const createModuleUploadUrl = require('../../../services/s3/createModuleUploadUrl');
+
+// Retrieve active and archived modules for Super Admins
+router.get(
+  '/',
+  auth,
+  requireRoles(ROLES.SUPER_ADMIN),
+  async (req, res) => {
+    try {
+      const modules = await fetchModuleList({
+        subcategoryId: req.query.subcategoryId,
+        type: req.query.type,
+        includeArchived: true,
+      });
+
+      return res.status(200).json(modules);
+    } catch (err) {
+      console.error('Error fetching administrative modules:', err);
+
+      return res.status(500).json({
+        message: 'Unable to retrieve modules.',
+      });
+    }
+  }
+);
 
 router.post(
   '/upload-url',
@@ -434,6 +459,86 @@ router.delete(
 
       return res.status(500).json({
         message: 'Unable to check module deletion eligibility.',
+      });
+    }
+  }
+);
+
+// ============================================
+// Archive a module
+// ============================================
+router.patch(
+  '/:moduleId/archive',
+  auth,
+  requireRoles(ROLES.SUPER_ADMIN),
+  async (req, res) => {
+    try {
+      const module = await Modules.findByPk(req.params.moduleId);
+
+      if (!module) {
+        return res.status(404).json({
+          message: 'Module not found.',
+        });
+      }
+
+      if (module.is_archived) {
+        return res.status(200).json({
+          message: 'Module is already archived.',
+          module,
+        });
+      }
+
+      await module.update({ is_archived: true });
+
+      return res.status(200).json({
+        message: 'Module archived successfully.',
+        module,
+      });
+    } catch (err) {
+      console.error('Error archiving module:', err);
+
+      return res.status(500).json({
+        message: 'Unable to archive module.',
+      });
+    }
+  }
+);
+
+// ============================================
+// Restore an archived module
+// ============================================
+router.patch(
+  '/:moduleId/restore',
+  auth,
+  requireRoles(ROLES.SUPER_ADMIN),
+  async (req, res) => {
+    try {
+      const module = await Modules.findByPk(req.params.moduleId);
+
+      if (!module) {
+        return res.status(404).json({
+          message: 'Module not found.',
+        });
+      }
+
+      if (!module.is_archived) {
+        return res.status(200).json({
+          message: 'Module is already active.',
+          module,
+        });
+      }
+
+      await module.update({ is_archived: false });
+
+      return res.status(200).json({
+        message: 'Module restored successfully.',
+        module,
+      });
+    } catch (err) {
+      console.error('Error restoring module:', err);
+
+      return res.status(500).json({
+        message: 'Unable to restore module.',
       });
     }
   }

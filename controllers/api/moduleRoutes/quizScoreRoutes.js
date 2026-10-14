@@ -201,6 +201,14 @@ router.post('/', auth, async (req, res) => {
       return res.status(404).json({ message: 'Module not found' });
     }
 
+    // Archived modules cannot accept new quiz submissions.
+    // Existing quiz scores and CME award history remain unchanged.
+    if (module.is_archived) {
+      return res.status(403).json({
+        message: 'This module has been archived and no longer accepts quiz submissions.',
+      });
+    }
+
     const resolvedModuleId = module.id;
 
     // Formal training modules require the appropriate class enrollment.

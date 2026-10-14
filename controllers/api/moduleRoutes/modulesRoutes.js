@@ -1,4 +1,8 @@
 const router = require('express').Router();
+const fetchModuleList = require('../../../services/modules/fetchModuleList');
+const auth = require('../../../middleware/auth');
+const requireRoles = require('../../../middleware/requireRoles');
+const ROLES = require('../../../utils/roles');
 const { sequelize } = require('../../../models');
 const {
   Modules,
@@ -11,88 +15,23 @@ const {
 } = require('../../../models');
 
 // ============================================
-// 🔹 GET all modules
+// GET active modules for HealthMAP
 // ============================================
 router.get('/', async (req, res) => {
-  const { subcategoryId, type } = req.query;
-
   try {
-    const typeFilter = typeof type === 'string' ? type.trim().toLowerCase() : undefined;
-    const whereClause = {};
-    if (typeFilter && ['module', 'animation'].includes(typeFilter)) {
-      whereClause.type = typeFilter; // ENUM('module','animation')
-    }
+    const modules = await fetchModuleList({
+      subcategoryId: req.query.subcategoryId,
+      type: req.query.type,
+      includeArchived: false,
+    });
 
-    const queryOptions = {
-      where: whereClause, 
-      distinct: true,
-      order: [['name', 'ASC']], 
-      attributes: [
-        'id',
-        'module_id',
-        'name',
-        'description',
-        'version',
-        'downloadLink',
-        'language',
-        'packageSize',
-        'content_updated_at',
-        'package_uploaded_at',
-        'type',
-        'has_quiz',
-        'credit_type',
-        'cme_credits',
-      ],
-      include: [
-        {
-          model: Modules,
-          as: 'redirectedModule',
-          attributes: ['id', 'name', 'module_id', 'description', 'downloadLink', 'language',],
-        },
-        {
-          model: SubCategories,
-          as: 'subCategories',
-          attributes: ['id', 'name', 'category_id'],
-          through: { attributes: [] },
-          include: [
-            {
-              model: Categories,
-              as: 'category',
-              attributes: ['id', 'name'],
-            },
-          ],
-          ...(subcategoryId ? { where: { id: subcategoryId } } : {}),
-        },
-        { 
-          model: Letters, 
-          as: 'letters', 
-          attributes: ['id', 'letters'] 
-        },
-        {
-          model: Keywords,
-          as: 'keywords',
-          attributes: ['id', 'name'],
-          through: { attributes: [] },
-        },
-        {
-          model: Programs,
-          as: 'programs',
-          attributes: ['id', 'name', 'training_type'],
-          through: { attributes: [] },
-        },
-        {
-          model: Specializations,
-          as: 'specializations',
-          attributes: ['id', 'name'],
-          through: { attributes: [] },
-        },
-      ],
-    };
-
-    const modules = await Modules.findAll(queryOptions);
-    res.status(200).json(modules);
+    return res.status(200).json(modules);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Error fetching active modules:', err);
+
+    return res.status(500).json({
+      message: 'Unable to retrieve modules.',
+    });
   }
 });
 
@@ -102,8 +41,9 @@ router.get('/', async (req, res) => {
 router.get('/names', async (req, res) => {
   try {
     const modules = await Modules.findAll({
+      where: { is_archived: false },
       attributes: ['id', 'module_id', 'name', 'credit_type', 'cme_credits', 'categories'],
-      order: [['name', 'ASC']], 
+      order: [['name', 'ASC']],
     });
     res.status(200).json(modules);
   } catch (err) {
@@ -168,7 +108,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', auth, requireRoles(ROLES.SUPER_ADMIN), async (req, res) => {
     const {
       name,
       module_id,
@@ -191,6 +131,11 @@ router.post('/', async (req, res) => {
       keyword_ids,
     } = req.body;
   try {
+    if (typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({
+        message: 'Module name is required.',
+      });
+    }
 
     if (
       credit_type === 'cme' &&
@@ -285,7 +230,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', auth, requireRoles(ROLES.SUPER_ADMIN), async (req, res) => {
     const {
       name,
       module_id,

@@ -77,6 +77,12 @@ Modules.init(
             defaultValue: true,
             comment: 'Indicates whether the learning module contains a final quiz',
         },
+        is_archived: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+            comment: 'Archived modules are hidden from learners but retained for historical records',
+        },
         credit_type: {
             type: DataTypes.ENUM('none', 'cme'),
             allowNull: false,
