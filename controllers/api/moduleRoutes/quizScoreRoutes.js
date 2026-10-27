@@ -73,6 +73,56 @@ async function issueCredentialsForModule({ userId, module }) {
   }
 }
 
+// Get CME module IDs previously credited to the authenticated user.
+router.get('/cme-awarded-modules', auth, async (req, res) => {
+  try {
+    // CME awards recorded in the ledger.
+    const awards = await CmeCreditAwards.findAll({
+      where: {
+        user_id: req.user.id,
+      },
+      attributes: ['module_id'],
+    });
+
+    // Historical passing CME quiz scores.
+    const passingScores = await QuizScores.findAll({
+      where: {
+        user_id: req.user.id,
+        score: { [Op.gte]: 80 },
+      },
+      attributes: ['module_id'],
+      include: [
+        {
+          model: Modules,
+          as: 'module',
+          attributes: [],
+          where: {
+            credit_type: 'cme',
+          },
+          required: true,
+        },
+      ],
+    });
+
+    const creditedModuleIds = [
+      ...new Set([
+        ...awards.map((award) => award.module_id),
+        ...passingScores.map((score) => score.module_id),
+      ]),
+    ];
+
+    return res.status(200).json({
+      credited_module_ids: creditedModuleIds,
+    });
+  } catch (error) {
+    console.error('Failed to fetch credited CME modules:', error);
+
+    return res.status(500).json({
+      message: 'Failed to fetch credited CME modules.',
+    });
+  }
+});
+
 router.get('/', auth, async (req, res) => {
   const { userId } = req.query;
   const userIsAdmin = req.user && (req.user.roleId === ROLES.ADMIN || req.user.roleId === ROLES.SUPER_ADMIN);
