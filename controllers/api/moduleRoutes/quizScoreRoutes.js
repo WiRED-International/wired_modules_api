@@ -351,14 +351,6 @@ router.post('/', auth, async (req, res) => {
 
       quizScore = result.quizScore;
       created = result.created;
-    } else {
-      // Preserve the existing CME score-saving behavior.
-      [quizScore, created] = await QuizScores.upsert({
-        module_id: resolvedModuleId,
-        user_id: parsedUserId,
-        score: parsedScore,
-        date_taken: parsedDateTaken,
-      });
     }
 
     // Recheck WiRED credentials after a passing formal-training score.
@@ -389,10 +381,21 @@ router.post('/', auth, async (req, res) => {
     let certificateToEmail = null;
     let certificateUser = null;
 
-    if (passed && module.credit_type === 'cme') {
+    if (module.credit_type === 'cme') {
       const transaction = await sequelize.transaction();
 
       try {
+        // Serialize every CME submission before reading the lifetime ledger or
+        // overwriting the mutable quiz score, including submissions across years.
+        const user = await Users.findByPk(parsedUserId, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+
+        if (!user) {
+          throw new Error('User not found for CME update');
+        }
+
         // A CME module may award credit only once per user, ever.
         const existingCmeAward = await CmeCreditAwards.findOne({
           where: {
@@ -400,11 +403,19 @@ router.post('/', auth, async (req, res) => {
             module_id: resolvedModuleId,
           },
           transaction,
+          lock: transaction.LOCK.UPDATE,
         });
 
-        if (existingCmeAward) {
-          await transaction.rollback();
-        } else {
+        // Retakes remain editable; the award holds the immutable credited result.
+        // Never infer a missing historical snapshot from this mutable row.
+        [quizScore, created] = await QuizScores.upsert({
+          module_id: resolvedModuleId,
+          user_id: parsedUserId,
+          score: parsedScore,
+          date_taken: parsedDateTaken,
+        }, { transaction });
+
+        if (!existingCmeAward && passed) {
           const cmeAward = await CmeCreditAwards.create(
             {
               user_id: parsedUserId,
@@ -412,20 +423,13 @@ router.post('/', auth, async (req, res) => {
               year: cmeYear,
               credits_awarded: module.cme_credits,
               awarded_at: new Date(),
+              credited_score: parsedScore,
+              credited_date_taken: parsedDateTaken,
             },
             { transaction }
           );
 
           credits_awarded = cmeAward.credits_awarded;
-
-          const user = await Users.findByPk(parsedUserId, {
-            transaction,
-            lock: transaction.LOCK.UPDATE,
-          });
-
-          if (!user) {
-            throw new Error('User not found for CME update');
-          }
 
           const currentYear = new Date().getFullYear();
 
@@ -468,8 +472,8 @@ router.post('/', auth, async (req, res) => {
           }
 
           await user.save({ transaction });
-          await transaction.commit();
         }
+        await transaction.commit();
       } catch (error) {
         if (!transaction.finished) {
           await transaction.rollback();

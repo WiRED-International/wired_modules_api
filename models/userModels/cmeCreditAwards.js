@@ -39,6 +39,17 @@ CmeCreditAwards.init(
       allowNull: false,
     },
 
+    // Null for legacy awards whose original attempt cannot be reconstructed.
+    credited_score: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+
+    credited_date_taken: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+
     credits_awarded: {
       type: DataTypes.INTEGER,
       allowNull: false,
