@@ -19,6 +19,7 @@ const { buildUserQueryFilters } = require("../../../middleware/accessControl");
 const { Op, Sequelize } = require("sequelize");
 const ROLES = require("../../../utils/roles")
 const calculateCmeCreditsBulk = require("../../../services/certificates/calculateCmeCreditsBulk");
+const calculateCmeCredits = require("../../../services/certificates/calculateCmeCredits");
 
 const sortAscend = 'ASC';
 const sortDescend = 'DESC';
@@ -63,7 +64,27 @@ router.get('/me', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    return res.status(200).json(user);
+    const year = new Date().getFullYear();
+    const cmeCredits = {
+      status: 'unavailable',
+      annualRequirement: 50,
+      currentYear: { year, earnedCredits: null },
+      previousYear: { year: year - 1, earnedCredits: null },
+    };
+
+    try {
+      const [current, previous] = await Promise.all([
+        calculateCmeCredits(req.user.id, year),
+        calculateCmeCredits(req.user.id, year - 1),
+      ]);
+      cmeCredits.status = 'available';
+      cmeCredits.currentYear.earnedCredits = current.credits;
+      cmeCredits.previousYear.earnedCredits = previous.credits;
+    } catch (error) {
+      console.error(`Failed to calculate CME credits for user ${req.user.id}:`, error);
+    }
+
+    return res.status(200).json({ ...user.toJSON(), cmeCredits });
   } catch (err) {
     console.log(err);
     return res.status(500).json({ message: err.message });
