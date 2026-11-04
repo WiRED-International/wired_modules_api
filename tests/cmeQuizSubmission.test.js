@@ -107,6 +107,10 @@ beforeEach(() => {
 
 afterEach(() => jest.useRealTimers());
 
+function databaseError(code, source = 'parent') {
+  return Object.assign(new Error(code), { [source]: { code } });
+}
+
 test('first award records authenticated identity, canonical module, credited score/date and balance', async () => {
   const year = new Date().getFullYear();
   const date = `${year}-04-03T12:00:00Z`;
@@ -336,4 +340,176 @@ test('balance-save failure rolls back a newly inserted award and preserves an ea
     expect(transactions[1].rollback).toHaveBeenCalledTimes(1);
     expect(store).toEqual(original);
   } finally { log.mockRestore(); }
+});
+
+describe('bounded CME transaction retries', () => {
+  beforeEach(() => jest.spyOn(console, 'error').mockImplementation(() => {}));
+  afterEach(() => jest.restoreAllMocks());
+
+  test.each([
+    ['ER_LOCK_DEADLOCK', 'parent'],
+    ['ER_LOCK_WAIT_TIMEOUT', 'original'],
+  ])('%s retries with a fresh transaction, user lock and lifetime lookup', async (code, source) => {
+    // Fail after award and certificate writes to exercise full rollback and state reset.
+    store.credits = 48;
+    const findUser = Users.findByPk.getMockImplementation();
+    Users.findByPk.mockImplementationOnce(async (...args) => {
+      const user = await findUser(...args);
+      user.save.mockRejectedValueOnce(databaseError(code, source));
+      return user;
+    });
+    const begin = sequelize.transaction.getMockImplementation();
+    sequelize.transaction.mockImplementation(async () => {
+      if (transactions.length) expect(transactions.at(-1).finished).toBe('rollback');
+      return begin();
+    });
+    const res = await submit();
+    expect(res.status).toBe(201);
+    expect(res.body.credits_awarded).toBe(2);
+    expect(transactions).toHaveLength(2);
+    expect(transactions[0]).not.toBe(transactions[1]);
+    expect(transactions[0].rollback).toHaveBeenCalledTimes(1);
+    expect(transactions[0].commit).not.toHaveBeenCalled();
+    expect(transactions[1].commit).toHaveBeenCalledTimes(1);
+    for (let i = 0; i < 2; i++) {
+      expect(Users.findByPk.mock.calls[i][1]).toEqual({
+        transaction: transactions[i], lock: transactions[i].LOCK.UPDATE,
+      });
+      expect(CmeCreditAwards.findOne.mock.calls[i][0].transaction).toBe(transactions[i]);
+      expect(QuizScores.upsert.mock.calls[i][1].transaction).toBe(transactions[i]);
+    }
+    expect(store.awards).toHaveLength(1);
+    expect(store.credits).toBe(50);
+    expect(store.certificates).toHaveLength(1);
+    expect(issueCmeCertificate).toHaveBeenCalledTimes(2);
+    expect(sendCme50AchievedEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('three transient failures exhaust the limit and roll back every attempt', async () => {
+    CmeCreditAwards.create.mockRejectedValue(databaseError('ER_LOCK_WAIT_TIMEOUT'));
+    const original = structuredClone(store);
+    const res = await submit();
+    expect(res.status).toBe(500);
+    expect(transactions).toHaveLength(3);
+    for (const tx of transactions) {
+      expect(tx.rollback).toHaveBeenCalledTimes(1);
+      expect(tx.commit).not.toHaveBeenCalled();
+    }
+    expect(store).toEqual(original);
+    expect(sendCme50AchievedEmail).not.toHaveBeenCalled();
+  });
+
+  test.each(['ER_BAD_FIELD_ERROR', 'ER_DUP_ENTRY', 'ECONNRESET'])(
+    'permanent or unrecognized %s does not retry', async code => {
+      CmeCreditAwards.create.mockRejectedValueOnce(databaseError(code));
+      expect((await submit()).status).toBe(500);
+      expect(transactions).toHaveLength(1);
+      expect(transactions[0].rollback).toHaveBeenCalledTimes(1);
+      expect(store.awards).toHaveLength(0);
+    }
+  );
+
+  test('Sequelize-already-rolled-back deadlock retries without a second rollback', async () => {
+    CmeCreditAwards.findOne.mockImplementationOnce(async ({ transaction: tx }) => {
+      await tx.rollback();
+      throw databaseError('ER_LOCK_DEADLOCK');
+    });
+    expect((await submit()).status).toBe(201);
+    expect(transactions).toHaveLength(2);
+    expect(transactions[0].rollback).toHaveBeenCalledTimes(1);
+    expect(store.awards).toHaveLength(1);
+  });
+
+  test('rollback failure aborts instead of starting another attempt', async () => {
+    const begin = sequelize.transaction.getMockImplementation();
+    sequelize.transaction.mockImplementationOnce(async () => {
+      const tx = await begin();
+      tx.rollback.mockImplementationOnce(async () => {
+        tx.release?.();
+        throw new Error('rollback failed');
+      });
+      return tx;
+    });
+    CmeCreditAwards.create.mockRejectedValueOnce(databaseError('ER_LOCK_DEADLOCK'));
+    expect((await submit()).status).toBe(500);
+    expect(transactions).toHaveLength(1);
+    expect(store.awards).toHaveLength(0);
+  });
+
+  test('retry across New Year captures a fresh acceptance time and preserves completion snapshot', async () => {
+    jest.setSystemTime(new Date(2026, 11, 31, 23, 59, 59));
+    const january = new Date(2027, 0, 1);
+    const completion = new Date(2026, 11, 25).toISOString();
+    const findUser = Users.findByPk.getMockImplementation();
+    Users.findByPk.mockImplementationOnce(async (...args) => {
+      const user = await findUser(...args);
+      user.save.mockImplementationOnce(async () => {
+        jest.setSystemTime(january);
+        throw databaseError('ER_LOCK_DEADLOCK');
+      });
+      return user;
+    });
+    expect((await submit(90, completion)).status).toBe(201);
+    expect(store.awards).toHaveLength(1);
+    expect(store.awards[0]).toMatchObject({ year: 2027, awarded_at: january,
+      credited_score: 90, credited_date_taken: new Date(completion) });
+    expect(store.year).toBe(2027);
+    expect(store.credits).toBe(2);
+  });
+
+  test.each([null, 88])('retry preserves historical award with credited score %s', async creditedScore => {
+    store.awards.push({ user_id: 7, module_id: 42, year: 2024, credits_awarded: 2,
+      credited_score: creditedScore,
+      credited_date_taken: creditedScore === null ? null : new Date(2024, 4, 1),
+      awarded_at: new Date(2024, 4, 3) });
+    const original = structuredClone(store.awards);
+    QuizScores.upsert.mockRejectedValueOnce(databaseError('ER_LOCK_WAIT_TIMEOUT'));
+    const res = await submit(99);
+    expect(res.status).toBe(201);
+    expect(res.body.credits_awarded).toBe(0);
+    expect(transactions).toHaveLength(2);
+    expect(store.awards).toEqual(original);
+    expect(CmeCreditAwards.create).not.toHaveBeenCalled();
+    expect(store.credits).toBe(0);
+  });
+
+  test('email failure after commit does not retry the transaction', async () => {
+    store.credits = 48;
+    sendCme50AchievedEmail.mockRejectedValueOnce(databaseError('ER_LOCK_DEADLOCK'));
+    expect((await submit()).status).toBe(201);
+    expect(transactions).toHaveLength(1);
+    expect(transactions[0].finished).toBe('commit');
+    expect(store.awards).toHaveLength(1);
+    expect(store.credits).toBe(50);
+    expect(sendCme50AchievedEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('response failure after successful commit does not retry the transaction', async () => {
+    jest.spyOn(express.response, 'json').mockImplementationOnce(() => {
+      throw databaseError('ER_LOCK_WAIT_TIMEOUT');
+    });
+    expect((await submit()).status).toBe(500);
+    expect(transactions).toHaveLength(1);
+    expect(transactions[0].finished).toBe('commit');
+    expect(transactions[0].rollback).not.toHaveBeenCalled();
+    expect(store.awards).toHaveLength(1);
+    expect(store.credits).toBe(2);
+  });
+
+  test('COMMIT error with uncertain outcome is never automatically replayed', async () => {
+    const begin = sequelize.transaction.getMockImplementation();
+    sequelize.transaction.mockImplementationOnce(async () => {
+      const tx = await begin();
+      const commit = tx.commit.getMockImplementation();
+      tx.commit.mockImplementationOnce(async () => {
+        await commit();
+        throw databaseError('ER_LOCK_DEADLOCK');
+      });
+      return tx;
+    });
+    expect((await submit()).status).toBe(500);
+    expect(transactions).toHaveLength(1);
+    expect(transactions[0].rollback).not.toHaveBeenCalled();
+    expect(store.awards).toHaveLength(1);
+  });
 });

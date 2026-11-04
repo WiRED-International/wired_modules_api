@@ -380,97 +380,117 @@ router.post('/', auth, async (req, res) => {
     let certificateUser = null;
 
     if (module.credit_type === 'cme') {
-      const transaction = await sequelize.transaction();
+      const maxAttempts = 3;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const transaction = await sequelize.transaction();
+        let commitStarted = false;
+        // Discard results and notification state from any rolled-back attempt.
+        credits_awarded = 0;
+        certificateToEmail = null;
+        certificateUser = null;
 
-      try {
-        // Serialize every CME submission before reading the lifetime ledger or
-        // overwriting the mutable quiz score, including submissions across years.
-        const user = await Users.findByPk(parsedUserId, {
-          transaction,
-          lock: transaction.LOCK.UPDATE,
-        });
+        try {
+          // Serialize every CME submission before reading the lifetime ledger or
+          // overwriting the mutable quiz score, including submissions across years.
+          const user = await Users.findByPk(parsedUserId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
 
-        if (!user) {
-          throw new Error('User not found for CME update');
-        }
+          if (!user) {
+            throw new Error('User not found for CME update');
+          }
 
-        // A CME module may award credit only once per user, ever.
-        const existingCmeAward = await CmeCreditAwards.findOne({
-          where: {
-            user_id: parsedUserId,
-            module_id: resolvedModuleId,
-          },
-          transaction,
-          lock: transaction.LOCK.UPDATE,
-        });
-
-        // Retakes remain editable; the award holds the immutable credited result.
-        // Never infer a missing historical snapshot from this mutable row.
-        [quizScore, created] = await QuizScores.upsert({
-          module_id: resolvedModuleId,
-          user_id: parsedUserId,
-          score: parsedScore,
-          date_taken: parsedDateTaken,
-        }, { transaction });
-
-        if (!existingCmeAward && passed) {
-          // Logical acceptance time, durable only if this transaction commits.
-          // Quiz completion time does not determine the CME reporting year.
-          const acceptedAt = new Date();
-          const cmeYear = acceptedAt.getFullYear();
-          const cmeAward = await CmeCreditAwards.create(
-            {
+          // A CME module may award credit only once per user, ever.
+          const existingCmeAward = await CmeCreditAwards.findOne({
+            where: {
               user_id: parsedUserId,
               module_id: resolvedModuleId,
-              year: cmeYear,
-              credits_awarded: module.cme_credits,
-              awarded_at: acceptedAt,
-              credited_score: parsedScore,
-              credited_date_taken: parsedDateTaken,
             },
-            { transaction }
-          );
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
 
-          credits_awarded = cmeAward.credits_awarded;
+          // Retakes remain editable; the award holds the immutable credited result.
+          // Never infer a missing historical snapshot from this mutable row.
+          [quizScore, created] = await QuizScores.upsert({
+            module_id: resolvedModuleId,
+            user_id: parsedUserId,
+            score: parsedScore,
+            date_taken: parsedDateTaken,
+          }, { transaction });
 
-          // Year rollover follows the same captured acceptance year.
-          if (user.cme_year !== cmeYear) {
-            user.cme_year = cmeYear;
-            user.cme_credits = 0;
-            user.cme_certificate_issued_at = null;
+          if (!existingCmeAward && passed) {
+            // Logical acceptance time, durable only if this transaction commits.
+            // Quiz completion time does not determine the CME reporting year.
+            const acceptedAt = new Date();
+            const cmeYear = acceptedAt.getFullYear();
+            const cmeAward = await CmeCreditAwards.create(
+              {
+                user_id: parsedUserId,
+                module_id: resolvedModuleId,
+                year: cmeYear,
+                credits_awarded: module.cme_credits,
+                awarded_at: acceptedAt,
+                credited_score: parsedScore,
+                credited_date_taken: parsedDateTaken,
+              },
+              { transaction }
+            );
+
+            credits_awarded = cmeAward.credits_awarded;
+
+            // Year rollover follows the same captured acceptance year.
+            if (user.cme_year !== cmeYear) {
+              user.cme_year = cmeYear;
+              user.cme_credits = 0;
+              user.cme_certificate_issued_at = null;
+            }
+
+            const previousCredits = user.cme_credits;
+            user.cme_credits += credits_awarded;
+
+            // 🎓 Certificate trigger (once per year)
+            if (
+              previousCredits < 50 &&
+              user.cme_credits >= 50 &&
+              !user.cme_certificate_issued_at
+            ) {
+              const certificate = await issueCmeCertificate({
+                user_id: user.id,
+                year: cmeYear,
+                issued_at: acceptedAt,
+                transaction,
+              });
+
+              user.cme_certificate_issued_at = certificate.issued_at;
+
+              certificateToEmail = certificate;
+              certificateUser = user;
+            }
+
+            await user.save({ transaction });
+          }
+          commitStarted = true;
+          await transaction.commit();
+          break;
+        } catch (error) {
+          if (!transaction.finished) {
+            await transaction.rollback();
           }
 
-          const previousCredits = user.cme_credits;
-          user.cme_credits += credits_awarded;
+          const databaseCode = error.parent?.code || error.original?.code;
+          const retryable = databaseCode === 'ER_LOCK_DEADLOCK' ||
+            databaseCode === 'ER_LOCK_WAIT_TIMEOUT';
 
-          // 🎓 Certificate trigger (once per year)
-          if (
-            previousCredits < 50 &&
-            user.cme_credits >= 50 &&
-            !user.cme_certificate_issued_at
-          ) {
-            const certificate = await issueCmeCertificate({
-              user_id: user.id,
-              year: cmeYear,
-              issued_at: acceptedAt,
-              transaction,
-            });
-
-            user.cme_certificate_issued_at = certificate.issued_at;
-
-            certificateToEmail = certificate;
-            certificateUser = user;
+          // A failed COMMIT can have an uncertain outcome; never replay it here.
+          // Rollback failures above also abort instead of retrying an unsafe state.
+          if (commitStarted || transaction.finished === 'commit' ||
+              !retryable || attempt === maxAttempts) {
+            throw error;
           }
-
-          await user.save({ transaction });
+          await new Promise(resolve => setTimeout(resolve, 25 * attempt));
         }
-        await transaction.commit();
-      } catch (error) {
-        if (!transaction.finished) {
-          await transaction.rollback();
-        }
-
-        throw error;
       }
     }
 
