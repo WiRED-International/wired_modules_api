@@ -376,8 +376,6 @@ router.post('/', auth, async (req, res) => {
     let credits_awarded = 0;
     const passed = parsedScore >= 80;
 
-    const cmeYear = parsedDateTaken.getFullYear();
-
     let certificateToEmail = null;
     let certificateUser = null;
 
@@ -416,13 +414,17 @@ router.post('/', auth, async (req, res) => {
         }, { transaction });
 
         if (!existingCmeAward && passed) {
+          // Logical acceptance time, durable only if this transaction commits.
+          // Quiz completion time does not determine the CME reporting year.
+          const acceptedAt = new Date();
+          const cmeYear = acceptedAt.getFullYear();
           const cmeAward = await CmeCreditAwards.create(
             {
               user_id: parsedUserId,
               module_id: resolvedModuleId,
               year: cmeYear,
               credits_awarded: module.cme_credits,
-              awarded_at: new Date(),
+              awarded_at: acceptedAt,
               credited_score: parsedScore,
               credited_date_taken: parsedDateTaken,
             },
@@ -431,37 +433,26 @@ router.post('/', auth, async (req, res) => {
 
           credits_awarded = cmeAward.credits_awarded;
 
-          const currentYear = new Date().getFullYear();
-
-          let previousCredits = user.cme_credits;
-
-          if (cmeYear === currentYear) {
-            // Year rollover (lazy reset)
-            if (user.cme_year !== currentYear) {
-              user.cme_year = currentYear;
-              user.cme_credits = 0;
-              user.cme_certificate_issued_at = null;
-            }
-
-            previousCredits = user.cme_credits;
-            user.cme_credits += credits_awarded;
+          // Year rollover follows the same captured acceptance year.
+          if (user.cme_year !== cmeYear) {
+            user.cme_year = cmeYear;
+            user.cme_credits = 0;
+            user.cme_certificate_issued_at = null;
           }
+
+          const previousCredits = user.cme_credits;
+          user.cme_credits += credits_awarded;
 
           // 🎓 Certificate trigger (once per year)
           if (
-            cmeYear === currentYear &&
             previousCredits < 50 &&
             user.cme_credits >= 50 &&
             !user.cme_certificate_issued_at
           ) {
-            user.cme_certificate_issued_at = new Date();
-
-            const year = new Date().getFullYear();
-
             const certificate = await issueCmeCertificate({
               user_id: user.id,
-              year,
-              issued_at: new Date(),
+              year: cmeYear,
+              issued_at: acceptedAt,
               transaction,
             });
 

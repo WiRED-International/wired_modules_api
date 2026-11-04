@@ -8,6 +8,30 @@ Retakes continue replacing the mutable `quiz_scores` result. Non-CME submissions
 still use the existing highest-score service and enrollment checks; formal exam
 routes are unchanged.
 
+## Award-year policy
+
+New CME credits belong to the server-local calendar year when the backend first
+accepts and records a qualifying submission, regardless of quiz completion date.
+Users completing quizzes offline must submit before the calendar-year deadline
+to count toward that year. No new reporting timezone is introduced.
+
+For a new qualifying award, the route captures one server timestamp after
+obtaining the user lock and confirming that no lifetime award exists, immediately
+before award creation. This is the logical acceptance time for an award whose
+transaction subsequently commits successfully, not the literal database COMMIT
+timestamp. An award captured just before midnight retains that year even if its
+transaction commits after midnight. A failed transaction records no award; a
+successful retry captures a fresh acceptance time.
+
+The captured timestamp supplies `awarded_at`; its server-local year supplies the
+ledger year, balance rollover, annual 50-credit threshold, and certificate year.
+An automatically triggered certificate uses that same timestamp as `issued_at`.
+Client `date_taken` remains the quiz completion date in the mutable score and the
+new award's `credited_date_taken` snapshot. Retries and retakes never move an
+existing award to another year or replace its score, completion date, or award
+timestamp. Historical awards, opening balances, and NULL snapshots are unchanged.
+No additional migration is required for this policy correction.
+
 ## Required schema change
 
 Deploy `20261103000000-add-cme-award-score-snapshot.js` before the updated code.
