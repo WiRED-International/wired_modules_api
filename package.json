@@ -38,6 +38,10 @@
     "supertest": "^7.1.1"
   },
   "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/tests/integration/"
+    ],
     "setupFiles": [
       "<rootDir>/tests/jest.setup.js"
     ]
