@@ -15,6 +15,9 @@ const {
   QuizScores,
 } = require('../../../models');
 const auth = require('../../../middleware/auth');
+const {
+  grantClassExamsToUser,
+} = require('../../../services/exams/syncClassExamAccess');
 
 
 // GET /api/classes/available
@@ -783,6 +786,12 @@ router.post('/:classId/enroll', auth, async (req, res) => {
       status: 'enrolled',
     });
 
+    await grantClassExamsToUser({
+      userId: user.id,
+      classId: classRecord.id,
+      grantedBy: user.id,
+    });
+
     return res.status(201).json({
       message: 'Enrollment successful.',
       enrollment,
@@ -1312,6 +1321,14 @@ router.post(
       }
 
       await transaction.commit();
+
+      if (enrollmentCreated) {
+        await grantClassExamsToUser({
+          userId: user.id,
+          classId: classRecord.id,
+          grantedBy: user.id,
+        });
+      }
 
       return res.status(
         enrollmentCreated ? 201 : 200

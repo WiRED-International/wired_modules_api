@@ -16,6 +16,9 @@ const auth = require('../../../middleware/auth');
 const requireRoles = require('../../../middleware/requireRoles');
 
 const ROLES = require('../../../utils/roles');
+const {
+  grantClassExamsToUser,
+} = require('../../../services/exams/syncClassExamAccess');
 
 router.get(
   '/',
@@ -756,6 +759,12 @@ router.post(
         user_id,
         class_id: classRecord.id,
         status: 'enrolled',
+      });
+
+      await grantClassExamsToUser({
+        userId: user_id,
+        classId: classRecord.id,
+        grantedBy: req.user.id,
       });
 
       return res.status(201).json({

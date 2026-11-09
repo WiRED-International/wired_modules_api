@@ -11,13 +11,14 @@ const {
 } = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require("../../../middleware/isAdmin");
+const ROLES = require("../../../utils/roles");
 const { calculateScore } = require("../../../utils/examUtils");
 const issueCredential = require('../../../services/credentials/issueCredential');
 
 // This route allows the user to submit their answers.
 router.put('/:id/submit', auth, async (req, res) => {
   const { id } = req.params;
-  const { answers, exam_id } = req.body;
+  const { answers, exam_id, completed_at } = req.body;
   const user_id = req.user.id;
 
   console.log('\nParam id:', id);
@@ -119,11 +120,20 @@ router.put('/:id/submit', auth, async (req, res) => {
     // ✅ 7️⃣ Calculate score with normalized answers
     const { score, correctCount, total } = await calculateScore(normalizedAnswers, session.exam_id);
 
+    // Accept offline-synced submissions completed earlier (e.g. synced the following day)
+    let effectiveSubmittedAt = new Date();
+    if (completed_at) {
+      const parsedCompletedAt = new Date(completed_at);
+      if (!Number.isNaN(parsedCompletedAt.getTime()) && parsedCompletedAt <= effectiveSubmittedAt) {
+        effectiveSubmittedAt = parsedCompletedAt;
+      }
+    }
+
     // 7️⃣ Update the session
     await session.update({
       answers,
       score,
-      submitted_at: new Date(),
+      submitted_at: effectiveSubmittedAt,
       active: false,
     });
 
@@ -259,11 +269,14 @@ router.get('/exam-sessions/:id/details', auth, isAdmin, async (req, res) => {
 
     }
 
+    const canViewCorrectAnswers =
+      Number(req.user?.roleId ?? req.user?.role_id) === ROLES.SUPER_ADMIN;
+
     const combined = questions.map((q) => ({
       question_id: q.id,
       question_text: q.question_text,
       options: q.options,
-      correct_answers: q.correct_answers,
+      ...(canViewCorrectAnswers ? { correct_answers: q.correct_answers } : {}),
       user_answer: session.answers?.[q.id] || null
     }));
 
