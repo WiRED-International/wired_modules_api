@@ -16,15 +16,63 @@ const {
 } = require('../../../models');
 const auth = require("../../../middleware/auth");
 const isAdmin = require('../../../middleware/isAdmin');
+const requireRoles = require('../../../middleware/requireRoles');
 const ROLES = require('../../../utils/roles');
 const { localToUtcISO, DEFAULT_EXAM_TIME_ZONE } = require("../../../utils/timezoneUtils");
 const { Op } = require("sequelize");
+
+const requireExamStaff = requireRoles(
+  ROLES.SUPER_ADMIN,
+  ROLES.ADMIN,
+  ROLES.INSTRUCTOR
+);
+
+function getUserRole(user) {
+  return Number(user?.roleId ?? user?.role_id);
+}
+
+/**
+ * Resolve organization IDs visible to the current user.
+ * - Super Admin (3): null (unrestricted), or [Number(requestedOrgId)] if filtered
+ * - Org Admin (2): organization_ids from AdminPermissions (intersected with requestedOrgId if provided)
+ * - Instructor (4): [Number(user.organization_id)] (intersected with requestedOrgId if provided)
+ */
+async function resolveAllowedOrgIds(currentUser, requestedOrgId) {
+  const role = getUserRole(currentUser);
+
+  if (role === ROLES.SUPER_ADMIN) {
+    return requestedOrgId ? [Number(requestedOrgId)] : null;
+  }
+
+  let allowedOrgIds = [];
+
+  if (role === ROLES.ADMIN) {
+    const perms = await AdminPermissions.findAll({
+      where: { admin_id: currentUser.id },
+      attributes: ['organization_id'],
+    });
+    allowedOrgIds = perms
+      .map((p) => Number(p.organization_id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+  } else if (role === ROLES.INSTRUCTOR) {
+    if (currentUser?.organization_id != null) {
+      allowedOrgIds = [Number(currentUser.organization_id)];
+    }
+  }
+
+  if (requestedOrgId) {
+    const reqOrg = Number(requestedOrgId);
+    return allowedOrgIds.includes(reqOrg) ? [reqOrg] : [];
+  }
+
+  return allowedOrgIds;
+}
 
 /**
  * 📋 GET /api/admin/exams
  * List all exams with basic info (for admin dashboard)
  */
-router.get('/', auth, isAdmin, async (req, res) => {
+router.get('/', auth, requireExamStaff, async (req, res) => {
   try {
     const exams = await Exams.findAll({
       attributes: ['id', 'title', 'available_from', 'available_until', 'duration_minutes'],
@@ -41,7 +89,7 @@ router.get('/', auth, isAdmin, async (req, res) => {
  * 📊 GET /api/admin/exams/kpis
  * KPI metrics for exam dashboard
  */
-router.get('/kpis', auth, isAdmin, async (req, res) => {
+router.get('/kpis', auth, requireExamStaff, async (req, res) => {
 
   try {
 
@@ -123,55 +171,28 @@ router.get('/kpis', auth, isAdmin, async (req, res) => {
     }
 
     // -------------------------------
-    // ADMIN VISIBILITY
+    // ADMIN & INSTRUCTOR VISIBILITY
     // -------------------------------
 
     const userIncludeWhere = {};
 
-    const currentUser =
-      req.user;
+    const currentUser = req.user;
+    const allowedOrgIds = await resolveAllowedOrgIds(currentUser, orgId);
 
-    if (orgId) {
-
-      userIncludeWhere.organization_id =
-        orgId;
-
-    } else if (
-      currentUser.role_id === 2
-    ) {
-
-      const perms =
-        await AdminPermissions.findAll({
-          where: {
-            admin_id:
-              currentUser.id
-          }
-        });
-
-      const orgIds =
-        perms
-          .map(
-            p => p.organization_id
-          )
-          .filter(
-            id => id != null
-          );
-
-      if (orgIds.length === 0) {
-
+    if (Array.isArray(allowedOrgIds)) {
+      if (allowedOrgIds.length === 0) {
         return res.json({
           totalAttempts: 0,
           averageScore: 0,
           passRate: 0,
           activeExams: 0,
         });
-
       }
 
-      userIncludeWhere.organization_id = {
-        [Op.in]: orgIds
-      };
-
+      userIncludeWhere.organization_id =
+        allowedOrgIds.length === 1
+          ? allowedOrgIds[0]
+          : { [Op.in]: allowedOrgIds };
     }
 
     // -------------------------------
@@ -359,7 +380,7 @@ router.get('/kpis', auth, isAdmin, async (req, res) => {
  * 📈 GET /api/admin/exams/analytics
  * Analytics data for exam dashboard charts
  */
-router.get('/analytics', auth, isAdmin, async (req, res) => {
+router.get('/analytics', auth, requireExamStaff, async (req, res) => {
   try {
     const {
       examId,
@@ -430,19 +451,10 @@ router.get('/analytics', auth, isAdmin, async (req, res) => {
 
     const userIncludeWhere = {};
     const currentUser = req.user;
+    const allowedOrgIds = await resolveAllowedOrgIds(currentUser, orgId);
 
-    if (orgId) {
-      userIncludeWhere.organization_id = orgId;
-    } else if (currentUser.role_id === 2) {
-      const perms = await AdminPermissions.findAll({
-        where: { admin_id: currentUser.id },
-      });
-
-      const orgIds = perms
-        .map(p => p.organization_id)
-        .filter(id => id != null);
-
-      if (orgIds.length === 0) {
+    if (Array.isArray(allowedOrgIds)) {
+      if (allowedOrgIds.length === 0) {
         return res.json({
           distribution: {
             excellent: 0,
@@ -450,12 +462,14 @@ router.get('/analytics', auth, isAdmin, async (req, res) => {
             needsImprovement: 0,
             totalCompleted: 0,
           },
+          mostMissedQuestions: [],
         });
       }
 
-      userIncludeWhere.organization_id = {
-        [Op.in]: orgIds,
-      };
+      userIncludeWhere.organization_id =
+        allowedOrgIds.length === 1
+          ? allowedOrgIds[0]
+          : { [Op.in]: allowedOrgIds };
     }
 
     const sessions = await ExamSessions.findAll({
@@ -1069,7 +1083,7 @@ router.put('/:id/questions', auth, isAdmin, async (req, res) => {
 router.get('/:id/questions', auth, isAdmin, async (req, res) => {
   const { id } = req.params;
   const includeAnswers = req.query.includeAnswers === 'true';
-  const userRole = req.user?.roleId;
+  const userRole = getUserRole(req.user);
 
   try {
 
@@ -1082,7 +1096,7 @@ router.get('/:id/questions', auth, isAdmin, async (req, res) => {
     }
 
     const canViewAnswers =
-      includeAnswers && (userRole === 2 || userRole === 3);
+      includeAnswers && userRole === ROLES.SUPER_ADMIN;
 
     let questions = [];
 
@@ -1143,7 +1157,7 @@ router.get('/:id/questions', auth, isAdmin, async (req, res) => {
  * 🧩 POST /api/admin/exams
  * Create a new exam
  */
-router.post('/', auth, isAdmin, async (req, res) => {
+router.post('/', auth, requireExamStaff, async (req, res) => {
   try {
     const {
       title,
@@ -1154,6 +1168,12 @@ router.post('/', auth, isAdmin, async (req, res) => {
       duration_minutes,
       exam_template_id
     } = req.body;
+
+    if (getUserRole(req.user) === ROLES.INSTRUCTOR && !exam_template_id) {
+      return res.status(403).json({
+        message: "Instructors may only schedule examinations from an existing approved exam template."
+      });
+    }
 
     if (!localStart || !localEnd) {
       return res.status(400).json({
@@ -1292,8 +1312,9 @@ router.put('/:examId/grant-attempt/:userId', auth, isAdmin, async (req, res) => 
  * All exam sessions (all exams + all orgs) with optional filters + pagination.
  * - Super Admin: sees everything
  * - Admin: only orgs in admin_permissions (visibility B)
+ * - Instructor: only their own organization
  */
-router.get('/results', auth, isAdmin, async (req, res) => {
+router.get('/results', auth, requireExamStaff, async (req, res) => {
   try {
     const {
       page = 1,
@@ -1423,25 +1444,14 @@ router.get('/results', auth, isAdmin, async (req, res) => {
     }
 
     // -------------------------------
-    // ADMIN VISIBILITY — ORG FILTERS
+    // ADMIN & INSTRUCTOR VISIBILITY — ORG FILTERS
     // -------------------------------
     const userIncludeWhere = {};
     const currentUser = req.user;
+    const allowedOrgIds = await resolveAllowedOrgIds(currentUser, orgId);
 
-    if (orgId) {
-      userIncludeWhere.organization_id = orgId;
-
-    } else if (currentUser.role_id === 2) {
-      // Admin must be restricted by admin_permissions
-      const perms = await AdminPermissions.findAll({
-        where: { admin_id: currentUser.id },
-      });
-
-      const orgIds = perms
-        .map(p => p.organization_id)
-        .filter(id => id != null);
-
-      if (orgIds.length === 0) {
+    if (Array.isArray(allowedOrgIds)) {
+      if (allowedOrgIds.length === 0) {
         return res.json({
           page: pageNum,
           limit: perPage,
@@ -1451,7 +1461,10 @@ router.get('/results', auth, isAdmin, async (req, res) => {
         });
       }
 
-      userIncludeWhere.organization_id = { [Op.in]: orgIds };
+      userIncludeWhere.organization_id =
+        allowedOrgIds.length === 1
+          ? allowedOrgIds[0]
+          : { [Op.in]: allowedOrgIds };
     }
 
     // -------------------------------
@@ -1693,7 +1706,7 @@ router.get('/results', auth, isAdmin, async (req, res) => {
  * 🧐 GET /api/admin/exams/sessions/:sessionId/details
  * View detailed answers + grading info for a single exam session
  */
-router.get('/sessions/:sessionId/details', auth, isAdmin, async (req, res) => {
+router.get('/sessions/:sessionId/details', auth, requireExamStaff, async (req, res) => {
   const { sessionId } = req.params;
   let questions = [];
 
@@ -1707,7 +1720,8 @@ router.get('/sessions/:sessionId/details', auth, isAdmin, async (req, res) => {
             'id',
             'first_name',
             'last_name',
-            'email'
+            'email',
+            'organization_id'
           ],
           include: [
             {
@@ -1753,6 +1767,19 @@ router.get('/sessions/:sessionId/details', auth, isAdmin, async (req, res) => {
     if (!session)
       return res.status(404).json({ message: 'Exam session not found' });
 
+    const userRole = getUserRole(req.user);
+    if (userRole !== ROLES.SUPER_ADMIN) {
+      const allowedOrgIds = await resolveAllowedOrgIds(req.user, null);
+      const sessionOrgId = Number(
+        session.class?.organization_id ?? session.users?.organization_id
+      );
+      if (!Array.isArray(allowedOrgIds) || !allowedOrgIds.includes(sessionOrgId)) {
+        return res.status(403).json({
+          message: 'You do not have permission to view this exam session.',
+        });
+      }
+    }
+
     if (session.exams?.exam_template_id) {
 
       questions = await ExamTemplateQuestions.findAll({
@@ -1789,6 +1816,7 @@ router.get('/sessions/:sessionId/details', auth, isAdmin, async (req, res) => {
     (session.answers || []).forEach(answer => {
       answerMap[answer.question_id] = answer;
     });
+    const canViewCorrectAnswers = userRole === ROLES.SUPER_ADMIN;
     const combined = questions.map(q => {
 
       const userAnswer =
@@ -1808,7 +1836,7 @@ router.get('/sessions/:sessionId/details', auth, isAdmin, async (req, res) => {
         question_id: q.id,
         question_text: q.question_text,
         options: q.options,
-        correct_answers: q.correct_answers,
+        ...(canViewCorrectAnswers ? { correct_answers: q.correct_answers } : {}),
         user_answer: userAnswer,
         is_correct: isCorrect,
       };
@@ -2238,7 +2266,7 @@ router.get('/summary', auth, isAdmin, async (req, res) => {
  * 📅 GET /api/admin/exams/upcoming
  * Returns upcoming exams with organization name + enrollment progress
  */
-router.get('/upcoming', auth, isAdmin, async (req, res) => {
+router.get('/upcoming', auth, requireExamStaff, async (req, res) => {
   try {
     const now = new Date();
 
@@ -2302,14 +2330,28 @@ router.get('/upcoming', auth, isAdmin, async (req, res) => {
       enrollmentMap[row.exam_id] = parseInt(row.dataValues.count, 10);
     });
 
+    const allowedOrgIds = await resolveAllowedOrgIds(req.user, null);
+    const visibleExams = Array.isArray(allowedOrgIds)
+      ? exams.filter((exam) =>
+          (exam.classes || []).some((c) =>
+            allowedOrgIds.includes(Number(c.organization_id))
+          )
+        )
+      : exams;
+
     // 3️⃣ Format response for UI
-    const formatted = exams.map((exam) => {
+    const formatted = visibleExams.map((exam) => {
       const total = enrollmentMap[exam.id] || 0;
+      const visibleClasses = Array.isArray(allowedOrgIds)
+        ? (exam.classes || []).filter((c) =>
+            allowedOrgIds.includes(Number(c.organization_id))
+          )
+        : exam.classes || [];
 
       return {
         id: exam.id,
         title: exam.title,
-        classes: exam.classes?.map((classItem) => ({
+        classes: visibleClasses.map((classItem) => ({
           id: classItem.id,
           name: classItem.name,
           organization: classItem.organization
@@ -2356,7 +2398,7 @@ router.get('/upcoming', auth, isAdmin, async (req, res) => {
  * participant counts, and status.
  * Supports filtering by organization, program, and class.
  */
-router.get('/scheduled', auth, isAdmin, async (req, res) => {
+router.get('/scheduled', auth, requireExamStaff, async (req, res) => {
 
   try {
 
@@ -2486,6 +2528,24 @@ router.get('/scheduled', auth, isAdmin, async (req, res) => {
     });
 
     let filtered = formatted;
+
+    const allowedOrgIds = await resolveAllowedOrgIds(req.user, organizationId);
+    if (Array.isArray(allowedOrgIds)) {
+      if (allowedOrgIds.length === 0) {
+        return res.json({
+          exams: [],
+          totalCount: 0,
+          page: Number(page),
+          pageCount: 0,
+        });
+      }
+
+      filtered = filtered.filter((exam) =>
+        exam.classes.some((classItem) =>
+          allowedOrgIds.includes(Number(classItem.organization_id))
+        )
+      );
+    }
 
     if (status && status !== 'All') {
 
@@ -2802,7 +2862,7 @@ router.get('/scheduled', auth, isAdmin, async (req, res) => {
  * 📋 GET /api/admin/exams/:examId
  * Get one scheduled exam with assigned classes and users
  */
-router.get('/:examId', auth, isAdmin, async (req, res) => {
+router.get('/:examId', auth, requireExamStaff, async (req, res) => {
   const { examId } = req.params;
 
   try {
@@ -2870,6 +2930,28 @@ router.get('/:examId', auth, isAdmin, async (req, res) => {
       });
     }
 
+    const allowedOrgIds = await resolveAllowedOrgIds(req.user, null);
+    if (Array.isArray(allowedOrgIds)) {
+      const examJson = typeof exam.toJSON === 'function' ? exam.toJSON() : { ...exam };
+      const allClasses = examJson.classes || [];
+      if (
+        allClasses.length > 0 &&
+        !allClasses.some((c) => allowedOrgIds.includes(Number(c.organization_id)))
+      ) {
+        return res.status(403).json({
+          message: 'You do not have permission to view this exam.',
+        });
+      }
+
+      examJson.classes = allClasses.filter((c) =>
+        allowedOrgIds.includes(Number(c.organization_id))
+      );
+      examJson.exam_user_access = (examJson.exam_user_access || []).filter((access) =>
+        allowedOrgIds.includes(Number(access.users?.organization_id))
+      );
+      return res.json(examJson);
+    }
+
     res.json(exam);
 
   } catch (err) {
@@ -2886,7 +2968,7 @@ router.get('/:examId', auth, isAdmin, async (req, res) => {
  * ✏️ PUT /api/admin/exams/:examId
  * Update basic exam details
  */
-router.put('/:examId', auth, isAdmin, async (req, res) => {
+router.put('/:examId', auth, requireExamStaff, async (req, res) => {
 
   const { examId } = req.params;
 
@@ -2902,12 +2984,48 @@ router.put('/:examId', auth, isAdmin, async (req, res) => {
 
   try {
 
-    const exam = await Exams.findByPk(examId);
+    const exam = await Exams.findByPk(examId, {
+      include: [
+        {
+          model: Classes,
+          as: 'classes',
+          attributes: ['id', 'organization_id'],
+          through: { attributes: [] },
+        },
+      ],
+    });
 
     if (!exam) {
       return res.status(404).json({
         message: 'Exam not found'
       });
+    }
+
+    const userRole = getUserRole(req.user);
+    if (userRole !== ROLES.SUPER_ADMIN) {
+      const allowedOrgIds = await resolveAllowedOrgIds(req.user, null);
+      const assignedClasses = exam.classes || [];
+
+      if (assignedClasses.length > 0) {
+        const hasUnrelatedClass = assignedClasses.some(
+          (c) => !allowedOrgIds.includes(Number(c.organization_id))
+        );
+        if (hasUnrelatedClass) {
+          return res.status(403).json({
+            message: 'You do not have permission to modify an exam assigned to another organization.',
+          });
+        }
+      }
+
+      if (
+        userRole === ROLES.INSTRUCTOR &&
+        exam_template_id !== undefined &&
+        Number(exam_template_id) !== Number(exam.exam_template_id)
+      ) {
+        return res.status(403).json({
+          message: 'Instructors cannot change the exam template of a scheduled exam.',
+        });
+      }
     }
 
     const zone =
