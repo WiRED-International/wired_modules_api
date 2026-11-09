@@ -84,15 +84,27 @@ router.get('/', auth, isSuperAdmin, async (req, res) => {
         }
         //if the user has provided latitude, longitude, and distance, then we will filter the results based on the distance from the provided coordinates
         if (latitude && longitude && distance !== undefined) {
-            const lat = parseFloat(latitude);
-            const lon = parseFloat(longitude);
+            const lat = Number(latitude);
+            const lon = Number(longitude);
+            const dist = Number(distance);
+            if (
+                String(latitude).trim() === '' ||
+                String(longitude).trim() === '' ||
+                String(distance).trim() === '' ||
+                !Number.isFinite(lat) ||
+                !Number.isFinite(lon) ||
+                !Number.isFinite(dist) ||
+                dist < 0
+            ) {
+                return res.status(400).json({ message: 'Invalid latitude, longitude, or distance parameter' });
+            }
             const earthRadiusMiles = 3958.8; // Earth's radius in miles
             whereConditions[Op.and] = Sequelize.literal(`
                 (${earthRadiusMiles} * acos(
                     cos(radians(${lat})) * cos(radians(Downloads.latitude)) * 
                     cos(radians(Downloads.longitude) - radians(${lon})) + 
                     sin(radians(${lat})) * sin(radians(Downloads.latitude))
-                )) <= ${distance}
+                )) <= ${dist}
             `);
         }
 

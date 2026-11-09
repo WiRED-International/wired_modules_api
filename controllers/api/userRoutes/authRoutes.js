@@ -5,6 +5,7 @@ const { UniqueConstraintError } = require("sequelize");
 const generateWiredUserId = require("../../../utils/generateWiredUserId");
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const ROLES = require('../../../utils/roles');
 const {
   sendWelcomeEmail,
   sendPasswordResetEmail,
@@ -18,7 +19,6 @@ router.post('/register', async (req, res) => {
     first_name,
     last_name,
     email,
-    role_id,
     country_id,
     city_id,
     organization_id,
@@ -58,7 +58,7 @@ router.post('/register', async (req, res) => {
         first_name,
         last_name,
         email,
-        role_id,
+        role_id: ROLES.USER,
         country_id,
         city_id,
         organization_id,
@@ -91,8 +91,14 @@ router.post('/register', async (req, res) => {
       { expiresIn: "10y" }
     );
 
+    const serializedUser =
+      typeof newUser.toJSON === "function"
+        ? newUser.toJSON()
+        : { ...newUser };
+    delete serializedUser.password;
+
     return res.status(201).json({
-      user: newUser,
+      user: serializedUser,
       token,
     });
 

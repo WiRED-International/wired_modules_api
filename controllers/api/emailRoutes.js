@@ -4,7 +4,23 @@ const router = express.Router();
 const AWS = require("aws-sdk");
 const multer = require("multer");
 
-const upload = multer(); // store file in memory
+const upload = multer({
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10 MB max PDF attachment
+  },
+}); // store file in memory
+
+function sanitizeHeaderValue(value, fallback = "") {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  return value.replace(/[\r\n]+/g, " ").trim() || fallback;
+}
+
+function sanitizeFileName(value) {
+  const cleaned = sanitizeHeaderValue(value, "cme-report.pdf").replace(/["\\]/g, "");
+  return cleaned || "cme-report.pdf";
+}
 
 AWS.config.update({
   region: "us-east-1", 
@@ -16,17 +32,28 @@ const ses = new AWS.SES({ apiVersion: "2010-12-01" });
 
 router.post("/upload-pdf", upload.single("file"), async (req, res) => {
   try {
-    const { recipient, senderName, message } = req.body;
+    const { recipient, senderName, message } = req.body || {};
+
+    const cleanRecipient = sanitizeHeaderValue(recipient);
+    if (!cleanRecipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanRecipient)) {
+      return res.status(400).json({ message: "A valid recipient email is required" });
+    }
+
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ message: "PDF file attachment is required" });
+    }
+
+    const cleanSenderName = sanitizeHeaderValue(senderName, "HealthMAP Learner");
     const fileBuffer = req.file.buffer;
     const boundary = "NextPart";
 
     const rawEmail = buildRawEmail({
-      from: process.env.SENDER_EMAIL,
-      to: recipient,
-      subject: `CME Report from ${senderName}`,
+      from: sanitizeHeaderValue(process.env.SENDER_EMAIL),
+      to: cleanRecipient,
+      subject: `CME Report from ${cleanSenderName}`,
       message,
       fileBuffer,
-      fileName: req.file.originalname,
+      fileName: sanitizeFileName(req.file.originalname),
       boundary,
     });
 

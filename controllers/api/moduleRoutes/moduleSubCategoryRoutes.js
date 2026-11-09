@@ -1,7 +1,10 @@
 const router = require('express').Router();
 const { Modules, SubCategories } = require('../../../models');
+const auth = require('../../../middleware/auth');
+const requireRoles = require('../../../middleware/requireRoles');
+const ROLES = require('../../../utils/roles');
 
-router.post('/modules-to-subCategories', async (req, res) => {
+router.post('/modules-to-subCategories', auth, requireRoles(ROLES.SUPER_ADMIN), async (req, res) => {
     const { module_id, subcategory_id } = req.body;
     try {
         const module = await Modules.findByPk(module_id);
@@ -15,7 +18,7 @@ router.post('/modules-to-subCategories', async (req, res) => {
       }
 });
 
-router.post('/subCategories-to-modules', async (req, res) => {
+router.post('/subCategories-to-modules', auth, requireRoles(ROLES.SUPER_ADMIN), async (req, res) => {
   const { subcategory_id, module_id } = req.body;
   try {
     const subCategory = await SubCategories.findByPk(subcategory_id);
@@ -29,7 +32,7 @@ router.post('/subCategories-to-modules', async (req, res) => {
   }
 });
 
-router.put('/modules/:module_id/subCategories', async (req, res) => {
+router.put('/modules/:module_id/subCategories', auth, requireRoles(ROLES.SUPER_ADMIN), async (req, res) => {
     const { module_id} = req.params;
     const { subCategories } = req.body;
     console.log('Module ID:', module_id);
@@ -47,7 +50,7 @@ router.put('/modules/:module_id/subCategories', async (req, res) => {
   }
 });
 
-router.put('/subcategories/:subcategory_id/modules', async (req, res) => {
+router.put('/subcategories/:subcategory_id/modules', auth, requireRoles(ROLES.SUPER_ADMIN), async (req, res) => {
     const { sub_category_id } = req.params; // Get the subcategory ID from the URL
     const { module_ids } = req.body; // Get the module IDs from the request body
   
