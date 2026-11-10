@@ -1,5 +1,8 @@
 const router = require('express').Router();
 const { Cities, Countries } = require('../../../models');
+const auth = require('../../../middleware/auth');
+const requireRoles = require('../../../middleware/requireRoles');
+const ROLES = require('../../../utils/roles');
 
 router.get('/', async (req, res) => {
   try {
@@ -30,7 +33,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', auth, requireRoles(ROLES.SUPER_ADMIN), async (req, res) => {
     const { name, country_id } = req.body;
   try {
     const newCity = await Cities.create({
@@ -44,7 +47,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', auth, requireRoles(ROLES.SUPER_ADMIN), async (req, res) => {
     const { name } = req.body;
   try {
     const city = await Cities.findByPk(req.params.id);
@@ -61,7 +64,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', auth, requireRoles(ROLES.SUPER_ADMIN), async (req, res) => {
   try {
     const city = await Cities.findByPk(req.params.id);
     if (!city) {

@@ -817,7 +817,7 @@ router.get("/:id", auth, isAdmin, async (req, res) => {
     // 🧩 ADMIN → limited access
     if (requester.roleId === ROLES.ADMIN) {
       // Allow admins to always view their own profile
-      if (requester.id === targetUserId) {
+      if (Number(requester.id) === Number(targetUserId)) {
         return res.status(200).json(user);
       }
       // Get all orgs this admin has permission for
@@ -908,7 +908,7 @@ router.get("/:id/transcript", auth, isAdmin, async (req, res) => {
       if (requester.roleId === ROLES.ADMIN) {
 
         // Admins may always view their own transcript.
-        if (requester.id !== targetUserId) {
+        if (Number(requester.id) !== Number(targetUserId)) {
 
           const adminPermissions = await AdminPermissions.findAll({
             where: {
@@ -1041,7 +1041,7 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
 
     if (userRoleId === ROLES.SUPER_ADMIN && updatedData.role_id !== undefined) {
       const parsedRoleId = parseInt(updatedData.role_id);
-      if (![ROLES.USER, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(parsedRoleId)) {
+      if (![ROLES.USER, ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.INSTRUCTOR].includes(parsedRoleId)) {
         return res.status(400).json({ message: "Invalid role_id provided for user being updated" });
       }
       updatedData.role_id = parsedRoleId;
@@ -1183,7 +1183,7 @@ router.delete("/:id", auth, isAdmin, async (req, res) => {
 
   const { id: targetUserId } = req.params; // Target user ID to delete
 
-  if (targetUserId === userId) {
+  if (Number(targetUserId) === Number(userId)) {
     return res.status(403).json({
       message: "You cannot delete your own user account",
     });
