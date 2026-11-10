@@ -9,8 +9,12 @@ const {
   ClassEnrollments
 } = require('../../../models');
 const auth = require("../../../middleware/auth");
+const ROLES = require("../../../utils/roles");
 const { Op } = require('sequelize');
-const { shuffleExamQuestions } = require("../../../utils/examUtils")
+const { shuffleExamQuestions } = require("../../../utils/examUtils");
+const {
+  syncEnrolledClassesExamAccessForUser,
+} = require("../../../services/exams/syncClassExamAccess");
 
 // GET /exams/available
 router.get('/available', auth, async (req, res) => {
@@ -52,7 +56,10 @@ router.get('/assigned', auth, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const assigned = await ExamUserAccess.findOne({
+    // Backfill ExamUserAccess for any exams assigned to the user's enrolled classes
+    await syncEnrolledClassesExamAccessForUser(userId);
+
+    const assignedList = await ExamUserAccess.findAll({
       where: { user_id: userId },
       include: [
         {
@@ -71,46 +78,50 @@ router.get('/assigned', auth, async (req, res) => {
       order: [['created_at', 'DESC']]
     });
 
-    if (!assigned || !assigned.exams) {
+    if (!Array.isArray(assignedList) || assignedList.length === 0) {
       return res.json([]); // No exam assigned
     }
-
-    const exam = assigned.exams;
 
     // Use Luxon for safe UTC handling
     const { DateTime } = require("luxon");
     const nowUTC = DateTime.now().toUTC();
-    const startUTC = DateTime.fromJSDate(exam.available_from).toUTC();
-    const endUTC = DateTime.fromJSDate(exam.available_until).toUTC();
 
-    // 🚫 Exam not open yet
-    if (nowUTC < startUTC) {
-      return res.json({
-        message: "Exam not yet open.",
-        exam_opens_at: startUTC.toISO(),
-        exam_closes_at: endUTC.toISO()
-      });
-    }
+    const openExams = [];
+    const upcomingExams = [];
 
-    // 🚫 Exam closed
-    if (nowUTC > endUTC) {
-      return res.json({
-        message: "Exam is closed.",
-        exam_closed_at: endUTC.toISO()
-      });
-    }
+    for (const assigned of assignedList) {
+      const exam = assigned?.exams;
+      if (!exam) continue;
 
-    // 🟢 Exam is currently open — send full info to Flutter
-    return res.json([
-      {
+      const startUTC = DateTime.fromJSDate(new Date(exam.available_from)).toUTC();
+      const endUTC = DateTime.fromJSDate(new Date(exam.available_until)).toUTC();
+
+      if (!startUTC.isValid || !endUTC.isValid || nowUTC > endUTC) {
+        continue;
+      }
+
+      const item = {
         exam_id: exam.id,
         title: exam.title,
         description: exam.description,
         duration_minutes: exam.duration_minutes,
-        available_from: startUTC.toISO(),   // send UTC ISO
-        available_until: endUTC.toISO()
+        available_from: startUTC.toISO(),
+        available_until: endUTC.toISO(),
+        status: nowUTC >= startUTC ? 'open' : 'upcoming',
+      };
+
+      if (nowUTC >= startUTC) {
+        openExams.push(item);
+      } else {
+        upcomingExams.push(item);
       }
-    ]);
+    }
+
+    upcomingExams.sort(
+      (a, b) => new Date(a.available_from).getTime() - new Date(b.available_from).getTime()
+    );
+
+    return res.json([...openExams, ...upcomingExams]);
 
   } catch (err) {
     console.error("❌ Error fetching assigned exam:", err);
@@ -138,13 +149,43 @@ router.get('/:id', auth, async (req, res) => {
 router.get('/:id/questions', auth, async (req, res) => {
 
   try {
+    const examId = Number(req.params.id);
+    const userId = req.user.id;
+    const userRole = Number(req.user.roleId ?? req.user.role_id);
 
-    const exam = await Exams.findByPk(req.params.id);
+    const exam = await Exams.findByPk(examId);
 
     if (!exam) {
       return res.status(404).json({
         message: 'Exam not found'
       });
+    }
+
+    const isAdminOrSuperAdmin =
+      userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN;
+
+    if (!isAdminOrSuperAdmin) {
+      await syncEnrolledClassesExamAccessForUser(userId);
+
+      const now = new Date();
+      if (now < new Date(exam.available_from) || now > new Date(exam.available_until)) {
+        return res.status(403).json({
+          message: 'Exam not currently available'
+        });
+      }
+
+      const access = await ExamUserAccess.findOne({
+        where: {
+          exam_id: examId,
+          user_id: userId,
+        },
+      });
+
+      if (!access) {
+        return res.status(403).json({
+          message: 'Access not granted for this exam'
+        });
+      }
     }
 
     let questions = [];
@@ -252,6 +293,9 @@ router.post('/:id/start-session', auth, async (req, res) => {
     if (now < exam.available_from || now > exam.available_until) {
       return res.status(403).json({ message: 'Exam not currently available' });
     }
+
+    // Backfill ExamUserAccess for any exams assigned to the user's enrolled classes
+    await syncEnrolledClassesExamAccessForUser(user_id);
 
     // 🔍 Check access permissions
     const access = await ExamUserAccess.findOne({
