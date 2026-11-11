@@ -169,6 +169,72 @@ describe('Admin & Instructor Exam Scoping (adminExamRoutes)', () => {
     });
   });
 
+  describe('PUT /api/admin/exams/:examId assignment authorization', () => {
+    const updatePayload = {
+      title: 'Updated MOH Exam',
+      localStart: '2026-11-20T09:00',
+      localEnd: '2026-11-20T12:00',
+      duration_minutes: 60,
+    };
+
+    test.each([
+      ['unassigned', []],
+      ['missing class association', undefined],
+      ['outside their organization', [{ id: 99, organization_id: 999 }]],
+      ['mixed organizations', [
+        { id: 12, organization_id: 2 },
+        { id: 99, organization_id: 999 },
+      ]],
+    ])('denies Instructor edits for %s exams without updating them', async (_label, classes) => {
+      const update = jest.fn().mockResolvedValue(undefined);
+      Exams.findByPk.mockResolvedValueOnce({
+        id: 801,
+        exam_template_id: 5,
+        classes,
+        update,
+      });
+
+      const res = await request(app)
+        .put('/api/admin/exams/801')
+        .set('Authorization', `Bearer ${instructorToken}`)
+        .send(updatePayload);
+
+      expect(res.statusCode).toBe(403);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ['Instructor within their organization', instructorToken, [{ id: 12, organization_id: 2 }]],
+      ['Super Admin with an unassigned exam', superAdminToken, []],
+      ['Super Admin with a cross-organization exam', superAdminToken, [
+        { id: 12, organization_id: 2 },
+        { id: 99, organization_id: 999 },
+      ]],
+      ['Org Admin with an unassigned exam', orgAdminToken, []],
+    ])('preserves editing for %s', async (_label, token, classes) => {
+      const update = jest.fn().mockResolvedValue(undefined);
+      Exams.findByPk.mockResolvedValueOnce({
+        id: 801,
+        exam_template_id: 5,
+        classes,
+        update,
+      });
+
+      const res = await request(app)
+        .put('/api/admin/exams/801')
+        .set('Authorization', `Bearer ${token}`)
+        .send(updatePayload);
+
+      expect(res.statusCode).toBe(200);
+      expect(update).toHaveBeenCalledTimes(1);
+      expect(update).toHaveBeenCalledWith(expect.objectContaining({
+        title: updatePayload.title,
+        duration_minutes: updatePayload.duration_minutes,
+        exam_template_id: 5,
+      }));
+    });
+  });
+
   describe('GET /api/admin/exams/sessions/:sessionId/details scoping & answer-key protection', () => {
     test('restricts session access by organization and hides correct_answers from non-Super-Admins', async () => {
       const sessionInOrg2 = {

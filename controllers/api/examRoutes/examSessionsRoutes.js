@@ -18,7 +18,9 @@ const issueCredential = require('../../../services/credentials/issueCredential')
 // This route allows the user to submit their answers.
 router.put('/:id/submit', auth, async (req, res) => {
   const { id } = req.params;
-  const { answers, exam_id, completed_at } = req.body;
+  const { answers, exam_id } = req.body;
+  // Client completion times are untrusted; delayed offline submissions remain valid.
+  const receivedAt = new Date();
   const user_id = req.user.id;
 
   console.log('\nParam id:', id);
@@ -120,20 +122,11 @@ router.put('/:id/submit', auth, async (req, res) => {
     // ✅ 7️⃣ Calculate score with normalized answers
     const { score, correctCount, total } = await calculateScore(normalizedAnswers, session.exam_id);
 
-    // Accept offline-synced submissions completed earlier (e.g. synced the following day)
-    let effectiveSubmittedAt = new Date();
-    if (completed_at) {
-      const parsedCompletedAt = new Date(completed_at);
-      if (!Number.isNaN(parsedCompletedAt.getTime()) && parsedCompletedAt <= effectiveSubmittedAt) {
-        effectiveSubmittedAt = parsedCompletedAt;
-      }
-    }
-
     // 7️⃣ Update the session
     await session.update({
       answers,
       score,
-      submitted_at: effectiveSubmittedAt,
+      submitted_at: receivedAt,
       active: false,
     });
 

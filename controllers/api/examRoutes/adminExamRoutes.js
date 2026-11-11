@@ -3006,6 +3006,12 @@ router.put('/:examId', auth, requireExamStaff, async (req, res) => {
       const allowedOrgIds = await resolveAllowedOrgIds(req.user, null);
       const assignedClasses = exam.classes || [];
 
+      if (userRole === ROLES.INSTRUCTOR && assignedClasses.length === 0) {
+        return res.status(403).json({
+          message: 'Instructors cannot modify an exam without an assigned class.',
+        });
+      }
+
       if (assignedClasses.length > 0) {
         const hasUnrelatedClass = assignedClasses.some(
           (c) => !allowedOrgIds.includes(Number(c.organization_id))
