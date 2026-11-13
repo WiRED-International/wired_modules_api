@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const AWS = require("aws-sdk");
 const multer = require("multer");
+const auth = require("../../middleware/auth");
 
 const upload = multer({
   limits: {
@@ -30,7 +31,7 @@ AWS.config.update({
 
 const ses = new AWS.SES({ apiVersion: "2010-12-01" });
 
-router.post("/upload-pdf", upload.single("file"), async (req, res) => {
+router.post("/upload-pdf", auth, upload.single("file"), async (req, res) => {
   try {
     const { recipient, senderName, message } = req.body || {};
 

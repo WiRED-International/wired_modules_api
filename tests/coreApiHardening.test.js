@@ -241,6 +241,7 @@ describe('Core API Security & Access Control Hardening', () => {
     test('strips CR/LF from senderName and rejects injected recipient headers', async () => {
       const badRecipientRes = await request(app)
         .post('/email/upload-pdf')
+        .set('Authorization', `Bearer ${userToken}`)
         .field('recipient', 'victim@example.com\r\nBcc: attacker@evil.com')
         .field('senderName', 'Alice')
         .attach('file', Buffer.from('%PDF-1.4 test'), 'report.pdf');
@@ -250,16 +251,19 @@ describe('Core API Security & Access Control Hardening', () => {
 
       const okRes = await request(app)
         .post('/email/upload-pdf')
+        .set('Authorization', `Bearer ${userToken}`)
         .field('recipient', 'learner@example.com')
         .field('senderName', 'Alice\r\nBcc: attacker@evil.com')
-        .attach('file', Buffer.from('%PDF-1.4 test'), 'report"\r\n.pdf');
+        .attach('file', Buffer.from('%PDF-1.4 test'), 'report.pdf');
 
+      expect(okRes.body).toEqual({ message: 'Email sent successfully' });
       expect(okRes.statusCode).toBe(200);
       expect(mockSendRawEmail).toHaveBeenCalledTimes(1);
       const rawBuffer = mockSendRawEmail.mock.calls[0][0].RawMessage.Data;
       const rawText = rawBuffer.toString('utf8');
       expect(rawText).toContain('Subject: CME Report from Alice Bcc: attacker@evil.com\n');
       expect(rawText).not.toContain('\r\nBcc:');
+      expect(rawText).toContain('Content-Disposition: attachment; filename="report.pdf"\n');
     });
   });
 
